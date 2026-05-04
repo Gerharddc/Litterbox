@@ -1,13 +1,13 @@
 use anyhow::{Result, bail};
 use clap::Args;
 use log::{debug, info, warn};
+#[cfg(not(target_os = "linux"))]
+use nix::sys::wait::{WaitStatus, waitpid};
 #[cfg(target_os = "linux")]
 use nix::sys::{
     inotify::{AddWatchFlags, InitFlags, Inotify},
     wait::{WaitStatus, waitpid},
 };
-#[cfg(not(target_os = "linux"))]
-use nix::sys::wait::{WaitStatus, waitpid};
 use std::path::Path;
 
 /// Wait for the Litterbox to finish (for internal use)
