@@ -326,9 +326,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
             }
         }
         _ => {
-            warn!(
-                "WAYLAND_DISPLAY/XDG_RUNTIME_DIR not set; GUI forwarding will be disabled"
-            );
+            warn!("WAYLAND_DISPLAY/XDG_RUNTIME_DIR not set; GUI forwarding will be disabled");
             None
         }
     };
