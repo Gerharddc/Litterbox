@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, Text};
 use inquire_derive::Selectable;
-use log::{debug, warn};
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, path::Path};
 
