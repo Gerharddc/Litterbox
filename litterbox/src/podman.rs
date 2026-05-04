@@ -4,6 +4,7 @@ use log::info;
 use log::{debug, warn};
 use nix::unistd::{getgid, getuid};
 use serde::Deserialize;
+use serde::de::Deserializer;
 use std::{
     ffi::OsString,
     fs,
@@ -25,19 +26,6 @@ use crate::{
 };
 
 const LBX_USER: &str = "user";
-
-#[cfg(target_os = "linux")]
-fn create_ssh_sock_for_mount(lbx_name: &str) -> Result<Option<SshSockFile>> {
-    Ok(Some(SshSockFile::new(lbx_name, true)?))
-}
-
-#[cfg(not(target_os = "linux"))]
-fn create_ssh_sock_for_mount(_: &str) -> Result<Option<SshSockFile>> {
-    warn!(
-        "SSH agent socket mounting is not supported on this host platform; key forwarding will be disabled"
-    );
-    Ok(None)
-}
 
 /// Represents the GPU device configuration for the container
 enum GpuDevice {
@@ -128,7 +116,15 @@ pub struct Image {
     pub id: String,
 
     #[serde(rename = "Names")]
+    #[serde(default, deserialize_with = "deserialize_names")]
     pub names: Vec<String>,
+}
+
+fn deserialize_names<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Option::<Vec<String>>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 #[derive(Deserialize, Debug)]
@@ -205,6 +201,7 @@ pub fn get_image(lbx_name: &str) -> Result<Option<Image>> {
 
     let stdout = extract_stdout(&output)?;
     let Images(mut images) = serde_json::from_str(stdout)?;
+    images.retain(|image| !image.names.is_empty());
 
     match images.len() {
         0 => Ok(None),
@@ -347,7 +344,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     let lbx_home_path = files::lbx_home_path(lbx_name)?;
     fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
 
-    let ssh_sock = create_ssh_sock_for_mount(lbx_name)?;
+    let ssh_sock = SshSockFile::new(lbx_name, true)?;
     let settings = LitterboxSettings::load_or_prompt(lbx_name)?;
 
     let session_lock_file_path = files::session_lock_path(lbx_name)?;
@@ -364,16 +361,15 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
 
     cmd.arg("--replace");
     cmd.args(["--entrypoint", "[\"/lbx-init\", \"wait\"]"]);
+    
     cmd.args(["--env", &format!("HOME=/home/{LBX_USER}")]);
     // Allow user to specify RUST_LOG to litterbox internal commands. Useful for
     // development and for debugging.
     cmd.args(["--env", "RUST_LOG"]);
-    if ssh_sock.is_some() {
-        cmd.args([
-            "--env",
-            &format!("SSH_AUTH_SOCK={}/ssh-agent.sock", rt_dir.to_string_lossy()),
-        ]);
-    }
+    cmd.args([
+        "--env",
+        &format!("SSH_AUTH_SOCK={}/ssh-agent.sock", rt_dir.to_string_lossy()),
+    ]);
     cmd.args([
         "--env",
         &format!("XDG_RUNTIME_DIR={}", rt_dir.to_string_lossy()),
@@ -402,15 +398,13 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(entrypoint_bin_mount);
 
-    if let Some(ssh_sock) = &ssh_sock {
-        let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
-        ssh_sock_mount.push(":");
-        ssh_sock_mount.push(&rt_dir);
-        ssh_sock_mount.push("/ssh-agent.sock");
+    let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
+    ssh_sock_mount.push(":");
+    ssh_sock_mount.push(&rt_dir);
+    ssh_sock_mount.push("/ssh-agent.sock");
 
-        cmd.arg("--volume");
-        cmd.arg(ssh_sock_mount);
-    }
+    cmd.arg("--volume");
+    cmd.arg(ssh_sock_mount);
 
     if let Some((wayland_display, host_rt_dir)) = &wayland {
         let mut wayland_display_mount = OsString::from(host_rt_dir);
