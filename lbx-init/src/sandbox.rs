@@ -1,9 +1,13 @@
 use anyhow::Result;
+#[cfg(target_os = "linux")]
 use landlock::{
     ABI, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, path_beneath_rules,
 };
-use log::{debug, error};
+use log::debug;
+#[cfg(target_os = "linux")]
+use log::error;
 
+#[cfg(target_os = "linux")]
 pub fn apply_landlock() -> Result<()> {
     // We avoid giving full access to the container's entire root directory so
     // that we can deny access to "internal" files that Litterbox places within
@@ -30,5 +34,11 @@ pub fn apply_landlock() -> Result<()> {
         Err(cause) => error!("Failed to apply Landlock sandbox: {cause:?}"),
     }
 
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn apply_landlock() -> Result<()> {
+    debug!("Landlock is not available on this platform; skipping sandbox setup");
     Ok(())
 }

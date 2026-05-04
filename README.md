@@ -49,7 +49,7 @@ gerhard@big-desktop:~$ ldd $(which litterbox)
 
 It also depends on `podman` being installed on your system and the `mknod` command being available.
 
-Hence, almost any modern Linux distro on which you can install `podman` should work. Litterbox also takes advantage of `Landlock` for added security on systems where it is available (i.e. most modern distros).
+Hence, almost any modern Linux distro on which you can install `podman` should work. Litterbox also supports macOS hosts, with Linux-specific hardening/features (such as Landlock and device attachment) automatically disabled there. Litterbox also takes advantage of `Landlock` for added security on systems where it is available (i.e. most modern distros). On platforms that do not support Landlock (such as macOS), this extra sandboxing layer is skipped.
 
 ## Installation
 
@@ -91,7 +91,7 @@ If you want SSH keys to be available inside a Litterbox, simply run `litterbox k
 
 ### 5. Devices
 
-If you ever need to make a device (such as a virtual serial port) available inside a Litterbox, simply run `litterbox device LBX_NAME DEVICE_PATH`. This will make the device available inside the Litterbox by creating a device node inside its home directory. To remove the device again later, simply delete this file that got created. Please note that the device node corresponds to a device using its device number and not some higher level identifier. Thus, if you for instance unplug the device and plug in a new device of the same type, the device node will now point to the new device. So be careful what you expose inside the Litterbox!
+If you ever need to make a device (such as a virtual serial port) available inside a Litterbox, simply run `litterbox device LBX_NAME DEVICE_PATH`. This will make the device available inside the Litterbox by creating a device node inside its home directory. To remove the device again later, simply delete this file that got created. Please note that the device node corresponds to a device using its device number and not some higher level identifier. Thus, if you for instance unplug the device and plug in a new device of the same type, the device node will now point to the new device. So be careful what you expose inside the Litterbox! This command currently only works on Linux hosts.
 
 ## Comparison to alternatives
 
