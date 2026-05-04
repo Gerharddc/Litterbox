@@ -26,6 +26,19 @@ use crate::{
 
 const LBX_USER: &str = "user";
 
+#[cfg(target_os = "linux")]
+fn create_ssh_sock_for_mount(lbx_name: &str) -> Result<Option<SshSockFile>> {
+    Ok(Some(SshSockFile::new(lbx_name, true)?))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn create_ssh_sock_for_mount(_: &str) -> Result<Option<SshSockFile>> {
+    warn!(
+        "SSH agent socket mounting is not supported on this host platform; key forwarding will be disabled"
+    );
+    Ok(None)
+}
+
 /// Represents the GPU device configuration for the container
 enum GpuDevice {
     /// Standard Linux GPU device at /dev/dri
@@ -334,7 +347,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     let lbx_home_path = files::lbx_home_path(lbx_name)?;
     fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
 
-    let ssh_sock = SshSockFile::new(lbx_name, true)?;
+    let ssh_sock = create_ssh_sock_for_mount(lbx_name)?;
     let settings = LitterboxSettings::load_or_prompt(lbx_name)?;
 
     let session_lock_file_path = files::session_lock_path(lbx_name)?;
@@ -355,10 +368,12 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     // Allow user to specify RUST_LOG to litterbox internal commands. Useful for
     // development and for debugging.
     cmd.args(["--env", "RUST_LOG"]);
-    cmd.args([
-        "--env",
-        &format!("SSH_AUTH_SOCK={}/ssh-agent.sock", rt_dir.to_string_lossy()),
-    ]);
+    if ssh_sock.is_some() {
+        cmd.args([
+            "--env",
+            &format!("SSH_AUTH_SOCK={}/ssh-agent.sock", rt_dir.to_string_lossy()),
+        ]);
+    }
     cmd.args([
         "--env",
         &format!("XDG_RUNTIME_DIR={}", rt_dir.to_string_lossy()),
@@ -387,13 +402,15 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(entrypoint_bin_mount);
 
-    let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
-    ssh_sock_mount.push(":");
-    ssh_sock_mount.push(&rt_dir);
-    ssh_sock_mount.push("/ssh-agent.sock");
+    if let Some(ssh_sock) = &ssh_sock {
+        let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
+        ssh_sock_mount.push(":");
+        ssh_sock_mount.push(&rt_dir);
+        ssh_sock_mount.push("/ssh-agent.sock");
 
-    cmd.arg("--volume");
-    cmd.arg(ssh_sock_mount);
+        cmd.arg("--volume");
+        cmd.arg(ssh_sock_mount);
+    }
 
     if let Some((wayland_display, host_rt_dir)) = &wayland {
         let mut wayland_display_mount = OsString::from(host_rt_dir);
