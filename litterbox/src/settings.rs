@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, Text};
 use inquire_derive::Selectable;
-use log::debug;
+use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, path::Path};
 
@@ -113,7 +113,7 @@ impl LitterboxSettings {
     fn load(lbx_name: &str) -> Result<Option<Self>> {
         let path = settings_path(lbx_name)?;
         if !path.exists() {
-            debug!("Settings file does not exist for {}", lbx_name);
+            info!("Settings file does not exist for {}", lbx_name);
             return Ok(None);
         }
 
@@ -171,20 +171,29 @@ impl LitterboxSettings {
                 .with_help_message("This will expose the AMD Kernel Fusion Driver for GPU compute.")
                 .prompt()?
         } else {
-            debug!("/dev/kfd not found on host system, user not prompted to expose it.");
+            warn!("/dev/kfd not found on host system, user not prompted to expose it.");
             false
         };
 
-        let expose_pipewire = if pipewire_socket_path()?.exists() {
-            Confirm::new("Do you want to expose PipeWire inside this Litterbox?")
-                .with_default(existing.map(|s| s.expose_pipewire).unwrap_or(false))
-                .with_help_message(
-                    "This will allow audio applications to work inside the Litterbox.",
-                )
-                .prompt()?
-        } else {
-            debug!("PipeWire socket not found on host system, user not prompted to expose it.");
-            false
+        let expose_pipewire = match pipewire_socket_path() {
+            Ok(path) if path.exists() => {
+                Confirm::new("Do you want to expose PipeWire inside this Litterbox?")
+                    .with_default(existing.map(|s| s.expose_pipewire).unwrap_or(false))
+                    .with_help_message(
+                        "This will allow audio applications to work inside the Litterbox.",
+                    )
+                    .prompt()?
+            }
+            Ok(_) => {
+                warn!("PipeWire socket not found on host system, user not prompted to expose it.");
+                false
+            }
+            Err(cause) => {
+                warn!(
+                    "Could not resolve PipeWire socket path ({cause}); PipeWire will be disabled."
+                );
+                false
+            }
         };
 
         let shm_size_default = existing.and_then(|s| s.shm_size_gb);
