@@ -7,8 +7,12 @@ mod define;
 mod delete;
 mod device;
 mod enter;
+#[cfg(target_os = "linux")]
+mod entrypoint;
 mod keys;
 mod list;
+#[cfg(target_os = "linux")]
+mod wait;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
@@ -36,6 +40,15 @@ pub enum Command {
 
     #[clap(hide = true)]
     Daemon(#[clap(flatten)] daemon::Command),
+
+    #[cfg(target_os = "linux")]
+    #[clap(hide = true)]
+    Wait(#[clap(flatten)] wait::Command),
+
+    // -h and -V conflict with a command's arguments
+    #[cfg(target_os = "linux")]
+    #[clap(hide = true, disable_help_flag = true, disable_version_flag = true)]
+    Entrypoint(#[clap(flatten)] entrypoint::Command),
 }
 
 impl Command {
@@ -50,6 +63,10 @@ impl Command {
             Command::Device(command) => command.run(),
             Command::Confirm(command) => command.run(),
             Command::Daemon(command) => command.run(),
+            #[cfg(target_os = "linux")]
+            Command::Wait(command) => command.run(),
+            #[cfg(target_os = "linux")]
+            Command::Entrypoint(command) => command.run(),
         }
     }
 }
