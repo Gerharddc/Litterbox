@@ -5,7 +5,6 @@ use crate::utils::SU_BINARIES;
 use anyhow::{Context as _, Result, bail};
 use clap::Args;
 use log::{debug, info, warn};
-#[cfg(target_os = "linux")]
 use nix::sys::prctl::set_child_subreaper;
 use nix::{
     sys::{
@@ -89,7 +88,6 @@ impl Command {
         let shell_pid = Pid::from_raw(shell_child.id() as i32);
         let mut waitpid_flags = WaitPidFlag::empty();
 
-        #[cfg(target_os = "linux")]
         set_child_subreaper(true).context("failed to make process child subreaper")?;
 
         loop {
