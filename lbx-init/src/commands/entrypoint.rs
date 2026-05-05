@@ -45,11 +45,11 @@ impl Command {
         chown(&xdg_runtime_dir, Some(self.uid), Some(self.gid))
             .context("Failed to set owner of $XDG_RUNTIME_DIR")?;
 
-        if !self.opts.root {
-            for su_bin in SU_BINARIES {
-                let _ = symlink("/lbx-init", format!("/usr/bin/{su_bin}"));
-            }
+        for su_bin in SU_BINARIES {
+            let _ = symlink("/lbx-init", format!("/usr/bin/{su_bin}"));
+        }
 
+        if !self.opts.root {
             setgid(self.gid)?;
             setuid(self.uid)?;
             debug!("Dropped from root to {}:{}", self.uid, self.gid);
