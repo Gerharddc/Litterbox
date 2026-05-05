@@ -26,11 +26,5 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Build
-        run: cargo build
-      - name: Run tests
-        run: cargo test
-      - name: Check formatting
-        run: cargo fmt --check
-      - name: Run linting
-        run: cargo clippy
+      - name: Buildand Test
+        run: ./build-and-test.sh
