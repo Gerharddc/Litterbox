@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, Text};
 use inquire_derive::Selectable;
-use log::{info, warn};
+use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, path::Path};
 
@@ -113,7 +113,7 @@ impl LitterboxSettings {
     fn load(lbx_name: &str) -> Result<Option<Self>> {
         let path = settings_path(lbx_name)?;
         if !path.exists() {
-            info!("Settings file does not exist for {}", lbx_name);
+            debug!("Settings file does not exist for {}", lbx_name);
             return Ok(None);
         }
 
