@@ -16,7 +16,6 @@ inquire = "0.9"
 inquire-derive = "0.9"
 landlock = "0.4"
 log = "0.4"
-names = { path = "../names" }
 nix = { version = "0.31", features = ["fs", "inotify", "signal", "user"] }
 ron = "0.12"
 russh = "0.60"

@@ -17,7 +17,7 @@ use crate::{
     files::{self, SshSockFile},
     keys::Keys,
     settings::LitterboxSettings,
-    utils::{extract_stdout, generate_name, trace_arguments},
+    utils::{extract_stdout, podman_name, trace_arguments},
 };
 use crate::{
     files::{dockerfile_path, write_file},
@@ -238,7 +238,7 @@ pub fn build_image(lbx_name: &str) -> Result<()> {
             details.names[0].clone()
         }
 
-        None => generate_name(),
+        None => podman_name(lbx_name),
     };
 
     let dockerfile_path = files::dockerfile_path(lbx_name)?;
@@ -300,7 +300,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
             }
         }
 
-        None => generate_name(),
+        None => podman_name(lbx_name),
     };
 
     // --userns=keep-id is used, so this is fine to be used in the container.

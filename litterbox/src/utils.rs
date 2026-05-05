@@ -30,9 +30,6 @@ pub fn extract_stdout(output: &Output) -> Result<&str> {
     Ok(str::from_utf8(&output.stdout)?)
 }
 
-pub fn generate_name() -> String {
-    let mut generator = names::Generator::with_naming(names::Name::Numbered);
-    let name = generator.next().expect("Name should not be None");
-
-    format!("lbx-{name}")
+pub fn podman_name(lbx_name: &str) -> String {
+    format!("lbx-{lbx_name}")
 }
