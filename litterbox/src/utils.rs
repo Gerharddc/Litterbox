@@ -2,12 +2,6 @@ use anyhow::{Result, bail};
 use log::trace;
 use std::process::{Command, Output};
 
-/// Binaries that can be used to gain temporarily root privileges.
-///
-/// Litterbox symlinks them to itself to inform users to use the "--root"
-/// argument if one wants to gain root access.
-pub const SU_BINARIES: &[&str] = &["run0", "sudo", "doas"];
-
 pub fn trace_arguments(cmd: &Command) {
     trace!(
         "Will run: {} {}",

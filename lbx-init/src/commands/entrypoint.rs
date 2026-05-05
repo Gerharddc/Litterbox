@@ -1,5 +1,7 @@
-use crate::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
-use crate::{env, files, sandbox, utils::SU_BINARIES};
+use crate::files;
+use crate::sandbox;
+use crate::utils::SU_BINARIES;
+
 use anyhow::{Context as _, Result, bail};
 use clap::Args;
 use log::{debug, info, warn};
@@ -11,6 +13,8 @@ use nix::{
     },
     unistd::{Gid, Pid, Uid, chown, setgid, setuid},
 };
+use shared::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
+use shared::env;
 use std::{
     os::unix::{fs::symlink, prelude::ExitStatusExt},
     process::{ExitStatus, Stdio},
@@ -43,7 +47,7 @@ impl Command {
 
         if !self.opts.root {
             for su_bin in SU_BINARIES {
-                let _ = symlink("/litterbox", format!("/usr/bin/{su_bin}"));
+                let _ = symlink("/lbx-init", format!("/usr/bin/{su_bin}"));
             }
 
             setgid(self.gid)?;
@@ -137,7 +141,7 @@ impl Command {
 
                         WaitBehaviour::Background => {
                             // Exit just this process to pass its descendants to
-                            // the next child subreaper, `litterbox wait` (the entrypoint).
+                            // the next child subreaper, `lbx-init wait` (the entrypoint).
                             info!("Continuing background processes in the background.");
 
                             break;

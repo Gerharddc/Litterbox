@@ -21,7 +21,7 @@ pub fn apply_landlock() -> Result<()> {
         .add_rules(path_beneath_rules(root_dirs, access_all))?
         .add_rules(path_beneath_rules(["/"], AccessFs::ReadDir))?
         .add_rules(path_beneath_rules(
-            ["/litterbox", "/prep-home.sh"],
+            ["/lbx-init", "/prep-home.sh"],
             AccessFs::Execute | AccessFs::ReadFile,
         ))?;
 

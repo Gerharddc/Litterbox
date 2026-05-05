@@ -1,45 +1,7 @@
-//! Common items for `litterbox entrypoint`.
+//! Common entrypoint types shared between `litterbox` and `lbx-init`.
 
 use clap::{Args, ValueEnum};
-use std::{
-    ffi::OsString,
-    fmt::Display,
-    str::{FromStr, ParseBoolError},
-};
-
-#[derive(Clone, Debug, Copy)]
-pub struct Tty(pub bool);
-
-impl Display for Tty {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl FromStr for Tty {
-    type Err = ParseBoolError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(Self(s.parse()?))
-    }
-}
-
-#[derive(Clone, Debug, Copy)]
-pub struct Interactive(pub bool);
-
-impl Display for Interactive {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl FromStr for Interactive {
-    type Err = ParseBoolError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(Self(s.parse()?))
-    }
-}
+use std::{ffi::OsString, fmt::Display};
 
 // If you add a new field, make sure to pass it inside the container in
 // `container_exec_entrypoint`.
@@ -61,7 +23,7 @@ pub struct CommonEntrypointOptions {
     pub args: Vec<OsString>,
 }
 
-#[derive(Clone, Copy, Debug, Default, clap::ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
 #[value(rename_all = "snake_case")]
 pub enum WaitBehaviour {
     /// Wait for background processes to exit.

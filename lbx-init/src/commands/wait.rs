@@ -41,7 +41,7 @@ impl Command {
 
         debug!("Waiting on unwaited-for child processes");
 
-        // `litterbox entrypoint` sends them over here.
+        // `lbx-init entrypoint` sends them over here.
         loop {
             match waitpid(None, None) {
                 Ok(WaitStatus::Exited(pid, status)) => {
