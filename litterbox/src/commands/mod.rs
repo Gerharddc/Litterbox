@@ -5,6 +5,7 @@ mod confirm;
 mod daemon;
 mod define;
 mod delete;
+#[cfg(target_os = "linux")]
 mod device;
 mod enter;
 #[cfg(target_os = "linux")]
@@ -24,6 +25,7 @@ pub enum Command {
     #[clap(visible_alias("del"), visible_alias("rm"))]
     Delete(#[clap(flatten)] delete::Command),
 
+    #[cfg(target_os = "linux")]
     #[clap(visible_alias("dev"))]
     Device(#[clap(flatten)] device::Command),
 
@@ -60,6 +62,7 @@ impl Command {
             Command::Enter(command) => command.run(),
             Command::Delete(command) => command.run(),
             Command::Keys(command) => command.run(),
+            #[cfg(target_os = "linux")]
             Command::Device(command) => command.run(),
             Command::Confirm(command) => command.run(),
             Command::Daemon(command) => command.run(),

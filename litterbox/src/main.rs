@@ -4,6 +4,7 @@ use std::env::VarError;
 mod agent;
 mod commands;
 mod daemon;
+#[cfg(target_os = "linux")]
 mod devices;
 mod env;
 mod files;
