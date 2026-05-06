@@ -1,9 +1,6 @@
 use anyhow::{Result, bail};
 use clap::Args;
 use log::{debug, info, warn};
-#[cfg(not(target_os = "linux"))]
-use nix::sys::wait::{WaitStatus, waitpid};
-#[cfg(target_os = "linux")]
 use nix::sys::{
     inotify::{AddWatchFlags, InitFlags, Inotify},
     wait::{WaitStatus, waitpid},
@@ -17,9 +14,7 @@ pub struct Command {}
 impl Command {
     pub fn run(self) -> Result<()> {
         let session_lock_path = Path::new("/session.lock");
-        #[cfg(target_os = "linux")]
         let inotify = Inotify::init(InitFlags::empty())?;
-        #[cfg(target_os = "linux")]
         inotify.add_watch(session_lock_path, AddWatchFlags::IN_MODIFY)?;
 
         info!("Litterbox has started");
@@ -41,15 +36,7 @@ impl Command {
                 }
             }
 
-            #[cfg(target_os = "linux")]
-            {
-                let _ = inotify.read_events()?;
-            }
-
-            #[cfg(not(target_os = "linux"))]
-            {
-                std::thread::sleep(std::time::Duration::from_millis(200));
-            }
+            let _ = inotify.read_events()?;
         }
 
         debug!("Waiting on unwaited-for child processes");

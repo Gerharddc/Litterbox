@@ -33,11 +33,14 @@ fn main() -> anyhow::Result<()> {
     if std_env::var("RUST_LOG").is_err() {
         // SAFETY: No other threads are reading or writing to env variables.
         unsafe {
-            #[cfg(debug_assertions)]
-            std_env::set_var("RUST_LOG", "debug");
-
-            #[cfg(not(debug_assertions))]
-            std_env::set_var("RUST_LOG", "info");
+            std_env::set_var(
+                "RUST_LOG",
+                if cfg!(debug_assertions) {
+                    "debug"
+                } else {
+                    "info"
+                },
+            );
         }
     }
 
