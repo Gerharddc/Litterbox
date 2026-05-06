@@ -1,3 +1,15 @@
+#[cfg(target_os = "linux")]
+use crate::files::SshSockFile;
+use crate::{
+    env, files,
+    keys::Keys,
+    settings::LitterboxSettings,
+    utils::{extract_stdout, podman_name, trace_arguments},
+};
+use crate::{
+    files::{dockerfile_path, write_file},
+    template::Template,
+};
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use inquire::Confirm;
 use log::info;
@@ -11,18 +23,6 @@ use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-};
-
-use crate::{
-    env,
-    files::{self, SshSockFile},
-    keys::Keys,
-    settings::LitterboxSettings,
-    utils::{extract_stdout, podman_name, trace_arguments},
-};
-use crate::{
-    files::{dockerfile_path, write_file},
-    template::Template,
 };
 
 const LBX_USER: &str = "user";
@@ -344,6 +344,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     let lbx_home_path = files::lbx_home_path(lbx_name)?;
     fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
 
+    #[cfg(target_os = "linux")]
     let ssh_sock = SshSockFile::new(lbx_name, true)?;
     let settings = LitterboxSettings::load_or_prompt(lbx_name)?;
 
@@ -366,6 +367,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     // Allow user to specify RUST_LOG to litterbox internal commands. Useful for
     // development and for debugging.
     cmd.args(["--env", "RUST_LOG"]);
+    #[cfg(target_os = "linux")]
     cmd.args([
         "--env",
         &format!("SSH_AUTH_SOCK={}/ssh-agent.sock", rt_dir.to_string_lossy()),
@@ -398,13 +400,16 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(entrypoint_bin_mount);
 
-    let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
-    ssh_sock_mount.push(":");
-    ssh_sock_mount.push(&rt_dir);
-    ssh_sock_mount.push("/ssh-agent.sock");
+    #[cfg(target_os = "linux")]
+    {
+        let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
+        ssh_sock_mount.push(":");
+        ssh_sock_mount.push(&rt_dir);
+        ssh_sock_mount.push("/ssh-agent.sock");
 
-    cmd.arg("--volume");
-    cmd.arg(ssh_sock_mount);
+        cmd.arg("--volume");
+        cmd.arg(ssh_sock_mount);
+    }
 
     if let Some((wayland_display, host_rt_dir)) = &wayland {
         let mut wayland_display_mount = OsString::from(host_rt_dir);
