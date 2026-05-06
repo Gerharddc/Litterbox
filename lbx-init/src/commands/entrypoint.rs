@@ -16,6 +16,7 @@ use nix::{
 use shared::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
 use shared::env;
 use std::{
+    fs,
     os::unix::{fs::symlink, prelude::ExitStatusExt},
     process::{ExitStatus, Stdio},
     sync::mpsc::RecvTimeoutError,
@@ -41,9 +42,22 @@ impl Command {
     pub fn run(self) -> Result<()> {
         use std::process::Command;
 
-        let xdg_runtime_dir = env::xdg_runtime_dir().context("$XDG_RUNTIME_DIR is not set")?;
-        chown(&xdg_runtime_dir, Some(self.uid), Some(self.gid))
-            .context("Failed to set owner of $XDG_RUNTIME_DIR")?;
+        match env::xdg_runtime_dir() {
+            Ok(xdg_runtime_dir) => {
+                if !xdg_runtime_dir.exists()
+                    && let Err(cause) = fs::create_dir_all(&xdg_runtime_dir)
+                {
+                    warn!("Failed to create $XDG_RUNTIME_DIR: {cause}");
+                }
+
+                if let Err(cause) = chown(&xdg_runtime_dir, Some(self.uid), Some(self.gid)) {
+                    warn!("Failed to set owner of $XDG_RUNTIME_DIR: {cause}");
+                }
+            }
+            Err(cause) => {
+                warn!("$XDG_RUNTIME_DIR is unavailable: {cause}");
+            }
+        }
 
         for su_bin in SU_BINARIES {
             let _ = symlink("/lbx-init", format!("/usr/bin/{su_bin}"));
