@@ -1,10 +1,8 @@
-use anyhow::Result;
-use anyhow::{Context, ensure};
+use anyhow::{Context, Result, ensure};
 use log::{debug, info};
 use nix::sys::stat::{SFlag, major, minor, stat};
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::{files::lbx_home_path, utils::trace_arguments};

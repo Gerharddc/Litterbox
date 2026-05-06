@@ -5,9 +5,9 @@ use crate::utils::SU_BINARIES;
 use anyhow::{Context as _, Result, bail};
 use clap::Args;
 use log::{debug, info, warn};
-use nix::sys::prctl::set_child_subreaper;
 use nix::{
     sys::{
+        prctl::set_child_subreaper,
         signal::{Signal, kill},
         wait::{WaitPidFlag, WaitStatus, waitpid},
     },
