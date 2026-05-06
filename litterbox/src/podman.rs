@@ -361,7 +361,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
 
     cmd.arg("--replace");
     cmd.args(["--entrypoint", "[\"/lbx-init\", \"wait\"]"]);
-    
+
     cmd.args(["--env", &format!("HOME=/home/{LBX_USER}")]);
     // Allow user to specify RUST_LOG to litterbox internal commands. Useful for
     // development and for debugging.

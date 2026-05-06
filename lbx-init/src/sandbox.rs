@@ -2,8 +2,7 @@ use anyhow::Result;
 use landlock::{
     ABI, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, path_beneath_rules,
 };
-use log::debug;
-use log::error;
+use log::{debug, error};
 
 pub fn apply_landlock() -> Result<()> {
     // We avoid giving full access to the container's entire root directory so

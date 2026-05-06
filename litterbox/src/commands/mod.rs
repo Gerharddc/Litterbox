@@ -38,7 +38,6 @@ pub enum Command {
 
     #[clap(hide = true)]
     Daemon(#[clap(flatten)] daemon::Command),
-
 }
 
 impl Command {
