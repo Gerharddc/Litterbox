@@ -31,15 +31,15 @@ fn main() -> anyhow::Result<()> {
 
     // Configure default log level for debug and release builds.
     if std_env::var("RUST_LOG").is_err() {
+        let default_log_level = if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "info"
+        };
+
         // SAFETY: No other threads are reading or writing to env variables.
         unsafe {
-            unsafe {
-                #[cfg(debug_assertions)]
-                std_env::set_var("RUST_LOG", "debug");
-
-                #[cfg(not(debug_assertions))]
-                std_env::set_var("RUST_LOG", "info");
-            }
+            std_env::set_var("RUST_LOG", default_log_level);
         }
     }
 

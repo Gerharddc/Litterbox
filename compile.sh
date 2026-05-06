@@ -4,6 +4,12 @@ set -e
 HOST_ARCH="$(rustc -vV | sed -n 's/^host: //p' | cut -d- -f1)"
 INIT_TARGET="${HOST_ARCH}-unknown-linux-musl"
 
+if [ "$(uname -s)" = "Darwin" ]; then
+    # Use Rust's bundled linker for Linux-musl cross-linking on macOS.
+    TARGET_ENV_SUFFIX="$(printf '%s' "$INIT_TARGET" | tr '[:lower:]-' '[:upper:]_')"
+    eval "export CARGO_TARGET_${TARGET_ENV_SUFFIX}_LINKER=rust-lld"
+fi
+
 if [ "${1:-}" = "--release" ]; then
     CARGO_FLAGS="--release"
     OUT_DIR="release"

@@ -392,7 +392,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(session_lock_mount);
 
-    let mut entrypoint_bin_mount = env::lbx_init_binary_path().into_os_string();
+    let mut entrypoint_bin_mount = env::checked_lbx_init_binary_path()?.into_os_string();
     entrypoint_bin_mount.push(":/lbx-init:ro");
 
     cmd.arg("--volume");
