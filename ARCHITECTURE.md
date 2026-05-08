@@ -2,6 +2,20 @@
 
 ## Core Components
 
+### lbx-init (Container Entrypoint)
+
+A minimal, statically-linked binary designed to run inside Litterbox containers. It handles two commands:
+
+- **entrypoint**: Initializes the user's home directory and launches the login shell inside the container. Handles privilege dropping and wait behaviour for background processes.
+- **wait**: Blocks until the session lock file is empty (all terminals closed), then waits for child processes to exit.
+
+**Key characteristics:**
+
+- Independent of the main `litterbox` binary
+- Statically linked and always built for Linux
+- Supports cross-compilation (useful on non-Linux hosts)
+- Mounted at `/lbx-init` in the container
+
 ### The Daemon
 
 A long-running daemon process manages each Litterbox. It is started automatically when entering a Litterbox and persists until the container is stopped.
@@ -47,7 +61,7 @@ A new short-livived process is spawned for each confirmation dialog. This is mai
 
 **Starting:**
 
-- The container entrypoint is `/litterbox wait`, which blocks until the session lock file is empty
+- The container entrypoint is `/lbx-init wait`, which blocks until the session lock file is empty
 - This is detected using inotify for efficient watching
 
 **Stopping:**
@@ -63,7 +77,7 @@ The isolation model restricts what the container can access:
 **Mounted Paths:**
 
 - `~/Litterbox/homes/{name}` → `/home/user` (user's home inside container)
-- `/litterbox` (binary, read-only) → Container entrypoint
+- `/lbx-init` (binary, read-only) → Container entrypoint
 - `/session.lock` (host's session lock, read-only) → Used for waiting
 - `/tmp/ssh-agent.sock` → SSH agent socket for key access
 - `/tmp/pipewire-0` (optional) → PipeWire socket for audio
@@ -93,5 +107,5 @@ When a user runs `litterbox enter NAME`:
 1. **Container Check** - Verify container exists; start if not running
 2. **Daemon Start** - If daemon not running, spawn it with the key password via stdin
 3. **Session Registration** - Add terminal PID to session lockfile
-4. **Entrypoint** - Run `/litterbox entrypoint` to initialize user's home directory (only on first entry) and then enter the default shell
+4. **Entrypoint** - Run `/lbx-init entrypoint` to initialize user's home directory (only on first entry) and then enter the default shell
 5. **Shell Launch** - Start user's shell inside the container

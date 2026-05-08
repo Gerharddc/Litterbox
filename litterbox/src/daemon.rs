@@ -3,8 +3,8 @@ use log::info;
 use nix::sys::signal::kill;
 use nix::unistd::Pid;
 
-use crate::Keys;
 use crate::files;
+use crate::keys::Keys;
 use crate::podman::is_container_running;
 
 pub async fn run(lbx_name: &str, password: &str) -> Result<()> {

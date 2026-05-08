@@ -2,7 +2,7 @@
 set -e
 
 INSTALL_DIR="$HOME/.local/bin"
-BINARIES=("litterbox")
+BINARIES=("litterbox" "lbx-init")
 
 print_path_warning() {
   case ":$PATH:" in

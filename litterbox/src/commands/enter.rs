@@ -1,7 +1,5 @@
 use crate::{
-    daemon,
-    entrypoint::{CommonEntrypointOptions, Interactive, Tty},
-    files,
+    daemon, files,
     podman::{
         get_container, is_container_running, start_daemon, wait_for_podman, wait_for_podman_async,
     },
@@ -11,7 +9,47 @@ use anyhow::{Context as _, Result, anyhow};
 use clap::Args;
 use log::{debug, info, warn};
 use nix::unistd::{Pid, getgid, getuid};
-use std::{path::PathBuf, process::Stdio};
+use shared::entrypoint::CommonEntrypointOptions;
+use std::{
+    fmt::Display,
+    path::PathBuf,
+    process::Stdio,
+    str::{FromStr, ParseBoolError},
+};
+
+#[derive(Clone, Debug, Copy)]
+pub struct Tty(pub bool);
+
+impl Display for Tty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl FromStr for Tty {
+    type Err = ParseBoolError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(Self(s.parse()?))
+    }
+}
+
+#[derive(Clone, Debug, Copy)]
+pub struct Interactive(pub bool);
+
+impl Display for Interactive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl FromStr for Interactive {
+    type Err = ParseBoolError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(Self(s.parse()?))
+    }
+}
 
 /// Enter an existing Litterbox
 #[derive(Args, Debug)]
@@ -120,7 +158,7 @@ async fn container_exec_entrypoint(
 
     exec_child.args([
         &container_id,
-        "/litterbox",
+        "/lbx-init",
         "entrypoint",
         "--uid",
         &getuid().to_string(),

@@ -2897,6 +2897,7 @@ dependencies = [
  "russh",
  "serde",
  "serde_json",
+ "shared",
  "strum",
  "strum_macros",
  "tabled",
@@ -4723,6 +4724,14 @@ checksum = "be176f1a57ce4e3d31c1a166222d9768de5954f811601fb7ca06fc8203905ce1"
 dependencies = [
  "digest 0.11.3",
  "keccak",
+]
+
+[[package]]
+name = "shared"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "clap",
 ]
 
 [[package]]

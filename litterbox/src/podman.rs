@@ -329,7 +329,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("create");
 
     cmd.arg("--replace");
-    cmd.args(["--entrypoint", "[\"/litterbox\", \"wait\"]"]);
+    cmd.args(["--entrypoint", "[\"/lbx-init\", \"wait\"]"]);
     cmd.args(["--env", &format!("HOME=/home/{LBX_USER}")]);
     // Allow user to specify RUST_LOG to litterbox internal commands. Useful for
     // development and for debugging.
@@ -358,11 +358,11 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(session_lock_mount);
 
-    let mut litterbox_bin_mount = env::litterbox_binary_path().into_os_string();
-    litterbox_bin_mount.push(":/litterbox:ro");
+    let mut entrypoint_bin_mount = env::lbx_init_binary_path().into_os_string();
+    entrypoint_bin_mount.push(":/lbx-init:ro");
 
     cmd.arg("--volume");
-    cmd.arg(litterbox_bin_mount);
+    cmd.arg(entrypoint_bin_mount);
 
     let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
     ssh_sock_mount.push(":");

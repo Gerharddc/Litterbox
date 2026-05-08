@@ -4,6 +4,10 @@ updates:
     directory: "/litterbox"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "cargo"
+    directory: "/lbx-init"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
