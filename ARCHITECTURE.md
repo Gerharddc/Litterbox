@@ -7,7 +7,6 @@
 A minimal, statically-linked binary designed to run inside Litterbox containers. It handles two commands:
 
 - **entrypoint**: Initializes the user's home directory and launches the login shell inside the container. Handles privilege dropping and wait behaviour for background processes.
-<<<<<<< HEAD
 - **wait**: Blocks until the session lock file is empty (all sessions closed), then waits for child processes to exit.
 
 **Key characteristics:**

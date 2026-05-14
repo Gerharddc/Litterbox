@@ -27,6 +27,3 @@ tabled = "0.20"
 tokio = { version = "1", features = ["process", "rt", "signal"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 rand = { version = "0.10", features = ["thread_rng"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-landlock = "0.4"
