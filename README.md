@@ -49,7 +49,7 @@ gerhard@big-desktop:~$ ldd $(which litterbox)
 
 It also depends on `podman` being installed on your system and the `mknod` command being available.
 
-Hence, almost any modern Linux distro on which you can install `podman` should work. Litterbox also supports macOS hosts, with Linux-specific hardening/features (such as Landlock and device attachment) automatically disabled there. Litterbox also takes advantage of `Landlock` for added security on systems where it is available (i.e. most modern distros). On platforms that do not support Landlock (such as macOS), this extra sandboxing layer is skipped.
+Hence, almost any modern Linux distro on which you can install `podman` should work. Litterbox also supports macOS hosts. Litterbox also takes advantage of `Landlock` for added security on systems where it is available (i.e. most modern distros).
 
 ## Installation
 

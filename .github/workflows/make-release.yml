@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Compile all binaries
+      - name: Build Release Binaries
         run: ./compile.sh --release
 
       - uses: actions/upload-artifact@v7

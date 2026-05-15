@@ -13,15 +13,11 @@ pub fn litterbox_binary_path() -> PathBuf {
     std::env::current_exe().expect("Binary path should be defined.")
 }
 
-pub fn lbx_init_binary_path() -> PathBuf {
-    litterbox_binary_path()
+pub fn lbx_init_binary_path() -> Result<PathBuf> {
+    let path = litterbox_binary_path()
         .parent()
         .expect("Litterbox binary path should have a parent")
-        .join("lbx-init")
-}
-
-pub fn checked_lbx_init_binary_path() -> Result<PathBuf> {
-    let path = lbx_init_binary_path();
+        .join("lbx-init");
     let mut file = std::fs::File::open(&path)
         .with_context(|| format!("Could not open lbx-init binary at '{}'", path.display()))?;
     let mut magic = [0_u8; 4];

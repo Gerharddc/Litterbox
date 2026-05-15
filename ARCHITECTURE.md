@@ -7,7 +7,7 @@
 A minimal, statically-linked binary designed to run inside Litterbox containers. It handles two commands:
 
 - **entrypoint**: Initializes the user's home directory and launches the login shell inside the container. Handles privilege dropping and wait behaviour for background processes.
-- **wait**: Blocks until the session lock file is empty (all sessions closed), then waits for child processes to exit.
+- **wait**: Blocks until the session lock file is empty (all terminals closed), then waits for child processes to exit.
 
 **Key characteristics:**
 
@@ -67,7 +67,7 @@ A new short-livived process is spawned for each confirmation dialog. This is mai
 **Stopping:**
 
 - When the daemon detects no active sessions, it exits
-- This triggers the container's `/lbx-init wait` to return
+- This triggers the container's entrypoint to return
 - Podman automatically stops the container
 
 ### File System Isolation

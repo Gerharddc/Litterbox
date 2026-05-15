@@ -2,13 +2,11 @@
 use crate::files::SshSockFile;
 use crate::{
     env, files,
+    files::{dockerfile_path, write_file},
     keys::Keys,
     settings::LitterboxSettings,
-    utils::{extract_stdout, podman_name, trace_arguments},
-};
-use crate::{
-    files::{dockerfile_path, write_file},
     template::Template,
+    utils::{extract_stdout, podman_name, trace_arguments},
 };
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use inquire::Confirm;
@@ -16,7 +14,6 @@ use log::info;
 use log::{debug, warn};
 use nix::unistd::{getgid, getuid};
 use serde::Deserialize;
-use serde::de::Deserializer;
 use std::{
     ffi::OsString,
     fs,
@@ -116,15 +113,8 @@ pub struct Image {
     pub id: String,
 
     #[serde(rename = "Names")]
-    #[serde(default, deserialize_with = "deserialize_names")]
+    #[serde(default)]
     pub names: Vec<String>,
-}
-
-fn deserialize_names<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(Option::<Vec<String>>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 #[derive(Deserialize, Debug)]
@@ -317,29 +307,10 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     let uid = getuid();
 
     let rt_dir = PathBuf::from(&format!("/run/user/{uid}"));
-    let wayland = match (
-        std::env::var("WAYLAND_DISPLAY"),
-        std::env::var("XDG_RUNTIME_DIR"),
-    ) {
-        (Ok(display), Ok(host_rt_dir)) => {
-            let host_rt_dir = PathBuf::from(host_rt_dir);
-            let socket_path = host_rt_dir.join(&display);
-
-            if socket_path.exists() {
-                Some((display, host_rt_dir))
-            } else {
-                warn!(
-                    "Wayland socket '{}' does not exist; GUI forwarding will be disabled",
-                    socket_path.display()
-                );
-                None
-            }
-        }
-        _ => {
-            warn!("WAYLAND_DISPLAY/XDG_RUNTIME_DIR not set; GUI forwarding will be disabled");
-            None
-        }
-    };
+    let wayland = std::env::var("WAYLAND_DISPLAY")
+        .ok()
+        .zip(std::env::var("XDG_RUNTIME_DIR").ok().map(PathBuf::from))
+        .filter(|(display, host_rt_dir)| host_rt_dir.join(display).exists());
 
     let lbx_home_path = files::lbx_home_path(lbx_name)?;
     fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
@@ -376,10 +347,6 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
         "--env",
         &format!("XDG_RUNTIME_DIR={}", rt_dir.to_string_lossy()),
     ]);
-    if let Some((wayland_display, _)) = &wayland {
-        cmd.args(["--env", "XDG_SESSION_TYPE=wayland"]);
-        cmd.args(["--env", &format!("WAYLAND_DISPLAY={wayland_display}")]);
-    }
     cmd.args(["--hostname", &format!("lbx-{lbx_name}")]);
     cmd.args(["--label", &format!("work.litterbox.name={lbx_name}")]);
     cmd.args(["--name", &container_name]);
@@ -394,7 +361,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(session_lock_mount);
 
-    let mut entrypoint_bin_mount = env::checked_lbx_init_binary_path()?.into_os_string();
+    let mut entrypoint_bin_mount = env::lbx_init_binary_path()?.into_os_string();
     entrypoint_bin_mount.push(":/lbx-init:ro");
 
     cmd.arg("--volume");
@@ -412,6 +379,9 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     }
 
     if let Some((wayland_display, host_rt_dir)) = &wayland {
+        cmd.args(["--env", "XDG_SESSION_TYPE=wayland"]);
+        cmd.args(["--env", &format!("WAYLAND_DISPLAY={wayland_display}")]);
+
         let mut wayland_display_mount = OsString::from(host_rt_dir);
         wayland_display_mount.push("/");
         wayland_display_mount.push(wayland_display);
@@ -444,27 +414,14 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     }
 
     if settings.expose_pipewire {
-        match files::pipewire_socket_path() {
-            Ok(path) if path.exists() => {
-                let mut pipewire_mount = path.into_os_string();
-                pipewire_mount.push(":");
-                pipewire_mount.push(rt_dir);
-                pipewire_mount.push("/pipewire-0");
+        let mut pipewire_mount = files::pipewire_socket_path()?.into_os_string();
+        pipewire_mount.push(":");
+        pipewire_mount.push(rt_dir);
+        pipewire_mount.push("/pipewire-0");
 
-                debug!("Appending PipeWire socket args");
-                cmd.arg("--volume");
-                cmd.arg(pipewire_mount);
-            }
-            Ok(path) => {
-                warn!(
-                    "PipeWire exposure requested but socket '{}' was not found; skipping",
-                    path.display()
-                );
-            }
-            Err(cause) => {
-                warn!("PipeWire exposure requested but unavailable ({cause}); skipping");
-            }
-        }
+        debug!("Appending PipeWire socket args");
+        cmd.arg("--volume");
+        cmd.arg(pipewire_mount);
     }
 
     if settings.support_tuntap {
