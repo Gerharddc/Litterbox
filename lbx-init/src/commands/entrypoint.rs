@@ -15,6 +15,7 @@ use nix::{
 };
 use shared::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
 use shared::env;
+use std::fs;
 use std::{
     os::unix::{fs::symlink, prelude::ExitStatusExt},
     process::{ExitStatus, Stdio},
@@ -42,6 +43,13 @@ impl Command {
         use std::process::Command;
 
         let xdg_runtime_dir = env::xdg_runtime_dir().context("$XDG_RUNTIME_DIR is not set")?;
+        if !xdg_runtime_dir.exists() {
+            debug!(
+                "Creating $XDG_RUNTIME_DIR at '{}'",
+                xdg_runtime_dir.display()
+            );
+            fs::create_dir_all(&xdg_runtime_dir)?;
+        }
         chown(&xdg_runtime_dir, Some(self.uid), Some(self.gid))
             .context("Failed to set owner of $XDG_RUNTIME_DIR")?;
 
