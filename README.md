@@ -18,7 +18,9 @@ N.B. Litterbox is free software that does not come with any warranty or guarante
 
 ## Introductory presentation
 
-[![Litterbox Presentation](https://img.youtube.com/vi/OMCWs7qmKFc/0.jpg)](https://www.youtube.com/watch?v=OMCWs7qmKFc)
+For those who like videos, the following presentation provides a quick overview of Litterbox:
+
+[![Litterbox Presentation](https://img.youtube.com/vi/OMCWs7qmKFc/maxresdefault.jpg)](https://www.youtube.com/watch?v=OMCWs7qmKFc)
 
 ## Isolation limitations
 
@@ -116,6 +118,8 @@ Litterbox is most similar to Distrobox in terms of its design and functionality.
 ## Stability
 
 Litterbox is still early in its development lifecycle and not particularly stable yet. Litterbox does not follow proper "semver" yet since we want to reserve 1.0.0 to signify a decent level of stability. Currently, (in the context of a version specified as `x.y.z`), changes in `y` will indicate breaking changes. It is therefore important to keep track of release notes for breaking changes when updating as you might have to make changes to your Litterbox definitions and rebuild them.
+
+Also keep in mind that the `main` branch might be broken from time to time because proper automated testing is not in place yet. Hence, it is recommended to also check out a tagged release if you want something that works. The releases are not guaranateed to be 100% working either, but more effort it made to test them.
 
 ## TODO
 
