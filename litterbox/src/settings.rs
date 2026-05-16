@@ -175,16 +175,26 @@ impl LitterboxSettings {
             false
         };
 
-        let expose_pipewire = if pipewire_socket_path()?.exists() {
-            Confirm::new("Do you want to expose PipeWire inside this Litterbox?")
-                .with_default(existing.map(|s| s.expose_pipewire).unwrap_or(false))
-                .with_help_message(
-                    "This will allow audio applications to work inside the Litterbox.",
-                )
-                .prompt()?
-        } else {
-            debug!("PipeWire socket not found on host system, user not prompted to expose it.");
-            false
+        let expose_pipewire = match pipewire_socket_path() {
+            Ok(path) => {
+                if path.exists() {
+                    Confirm::new("Do you want to expose PipeWire inside this Litterbox?")
+                        .with_default(existing.map(|s| s.expose_pipewire).unwrap_or(false))
+                        .with_help_message(
+                            "This will allow audio applications to work inside the Litterbox.",
+                        )
+                        .prompt()?
+                } else {
+                    debug!(
+                        "PipeWire socket not found on host system, user not prompted to expose it."
+                    );
+                    false
+                }
+            }
+            Err(e) => {
+                debug!("Failed to determine PipeWire socket path: {:?}", e);
+                false
+            }
         };
 
         let shm_size_default = existing.and_then(|s| s.shm_size_gb);
