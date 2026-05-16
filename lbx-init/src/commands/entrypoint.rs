@@ -1,16 +1,20 @@
-use crate::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
-use crate::{env, files, sandbox, utils::SU_BINARIES};
-use anyhow::{bail, Context as _, Result};
+use crate::files;
+use crate::sandbox;
+use crate::utils::SU_BINARIES;
+
+use anyhow::{Context as _, Result, bail};
 use clap::Args;
 use log::{debug, info, warn};
 use nix::{
     sys::{
         prctl::set_child_subreaper,
-        signal::{kill, Signal},
-        wait::{waitpid, WaitPidFlag, WaitStatus},
+        signal::{Signal, kill},
+        wait::{WaitPidFlag, WaitStatus, waitpid},
     },
-    unistd::{chown, setgid, setuid, Gid, Pid, Uid},
+    unistd::{Gid, Pid, Uid, chown, setgid, setuid},
 };
+use shared::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
+use shared::env;
 use std::{
     os::unix::{fs::symlink, prelude::ExitStatusExt},
     process::{ExitStatus, Stdio},
@@ -43,7 +47,7 @@ impl Command {
 
         if !self.opts.root {
             for su_bin in SU_BINARIES {
-                let _ = symlink("/litterbox", format!("/usr/bin/{su_bin}"));
+                let _ = symlink("/lbx-init", format!("/usr/bin/{su_bin}"));
             }
 
             setgid(self.gid)?;
