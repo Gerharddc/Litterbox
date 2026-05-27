@@ -29,19 +29,16 @@ fn key_to_openssh(key: &PrivateKey) -> Result<String> {
 }
 
 fn hash_password(password: &str) -> String {
-    use argon2::password_hash::{PasswordHasher, SaltString, rand_core::OsRng};
+    use argon2::password_hash::PasswordHasher;
 
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-
-    argon2
-        .hash_password(password.as_bytes(), &salt)
+    Argon2::default()
+        .hash_password(password.as_bytes())
         .expect("Passwords should be hashable")
         .to_string()
 }
 
 fn check_password(password: &str, hash: &str) -> bool {
-    use argon2::password_hash::{PasswordHash, PasswordVerifier};
+    use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
 
     let parsed_hash = PasswordHash::new(hash).expect("Passwords should have valid hashes");
 
