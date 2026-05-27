@@ -3,8 +3,7 @@ set -e
 
 REPO="Gerharddc/litterbox"
 INSTALL_DIR="$HOME/.local/bin"
-BINARY_NAME="litterbox"
-DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$BINARY_NAME"
+BINARIES="litterbox lbx-init"
 
 ARCH="$(uname -m)"
 
@@ -16,7 +15,7 @@ case "$ARCH" in
   *)
     echo "⚠ Unsupported architecture detected: $ARCH"
     echo ""
-    echo "Only x86-64 builds of 'litterbox' are currently available."
+    echo "Only x86-64 builds of 'litterbox' and 'lbx-init' are currently available."
     echo "Please build from source instead:"
     echo ""
     echo "  git clone https://github.com/$REPO.git"
@@ -29,7 +28,7 @@ case "$ARCH" in
 esac
 # ------------------------------------------
 
-echo "Installing $BINARY_NAME from latest $REPO release..."
+echo "Installing binaries from latest $REPO release..."
 echo ""
 
 # Ensure install dir exists
@@ -38,15 +37,14 @@ if [ ! -d "$INSTALL_DIR" ]; then
   mkdir -p "$INSTALL_DIR"
 fi
 
-# Download binary
-echo "Downloading $BINARY_NAME..."
-curl -fL "$DOWNLOAD_URL" -o "$INSTALL_DIR/$BINARY_NAME"
+for BIN in $BINARIES; do
+  DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$BIN"
+  echo "Downloading $BIN..."
+  curl -fL "$DOWNLOAD_URL" -o "$INSTALL_DIR/$BIN"
+  chmod +x "$INSTALL_DIR/$BIN"
+  echo "✔ Installed to $INSTALL_DIR/$BIN"
+done
 
-# Make executable
-chmod +x "$INSTALL_DIR/$BINARY_NAME"
-
-echo ""
-echo "✔ Installed to $INSTALL_DIR/$BINARY_NAME"
 echo ""
 
 # PATH check
