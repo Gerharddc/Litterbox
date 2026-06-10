@@ -20,7 +20,7 @@ N.B. Litterbox is free software that does not come with any warranty or guarante
 
 For those who like videos, the following presentation provides a quick overview of Litterbox:
 
-[![Litterbox Presentation](https://img.youtube.com/vi/OMCWs7qmKFc/maxresdefault.jpg)](https://www.youtube.com/watch?v=OMCWs7qmKFc)
+[![Litterbox Presentation](https://img.youtube.com/vi/MjEfGRDy-wA/maxresdefault.jpg)](https://www.youtube.com/watch?v=MjEfGRDy-wA)
 
 ## Isolation limitations
 
