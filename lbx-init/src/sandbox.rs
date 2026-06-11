@@ -23,7 +23,8 @@ pub fn apply_landlock() -> Result<()> {
         .add_rules(path_beneath_rules(
             ["/lbx-init", "/prep-home.sh"],
             AccessFs::Execute | AccessFs::ReadFile,
-        ))?;
+        ))?
+        .add_rules(path_beneath_rules(["/session.lock"], AccessFs::ReadFile))?;
 
     match ruleset.restrict_self() {
         Ok(status) => debug!("Landlock sandbox applied: {status:?}"),

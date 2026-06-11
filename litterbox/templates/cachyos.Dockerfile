@@ -9,6 +9,10 @@ RUN pacman -Syu --noconfirm && \
 # Install the fish shell for a nicer experience (ADAPT TO YOUR OWN NEEDS)
 RUN pacman -S --noconfirm fish
 
+# Setup support for X11 apps through xwayland (ADAPT TO YOUR OWN NEEDS)
+RUN pacman -S --noconfirm xwayland-satellite
+ENV DISPLAY=:0
+
 # Install development toolchain and additional package managers (ADAPT TO YOUR OWN NEEDS)
 RUN pacman -S --noconfirm gcc
 

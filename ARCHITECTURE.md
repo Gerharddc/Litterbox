@@ -7,7 +7,7 @@
 A minimal, statically-linked binary designed to run inside Litterbox containers. It handles two commands:
 
 - **entrypoint**: Initializes the user's home directory and launches the login shell inside the container. Handles privilege dropping and wait behaviour for background processes.
-- **wait**: Blocks until the session lock file is empty (all terminals closed), then waits for child processes to exit.
+- **wait**: Blocks until the session lock file is empty (all terminals closed), then waits for child processes to exit. Also starts `xwayland-satellite` as a background daemon if it is installed.
 
 **Key characteristics:**
 
@@ -61,8 +61,8 @@ A new short-livived process is spawned for each confirmation dialog. This is mai
 
 **Starting:**
 
-- The container entrypoint is `/lbx-init wait`, which blocks until the session lock file is empty
-- This is detected using inotify for efficient watching
+- The container entrypoint is `/lbx-init wait`, which blocks until the session lock file is empty; this is detected using inotify for efficient watching
+- If `xwayland-satellite` is present in `$PATH`, it is started as a background daemon; `DISPLAY` is passed as a positional argument if set
 
 **Stopping:**
 

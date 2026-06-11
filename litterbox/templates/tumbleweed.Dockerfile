@@ -8,6 +8,10 @@ RUN zypper refresh && \
 # Install the fish shell for a nicer experience (ADAPT TO YOUR OWN NEEDS)
 RUN zypper in -y fish
 
+# Setup support for X11 apps through xwayland (ADAPT TO YOUR OWN NEEDS)
+RUN zypper in -y xwayland-satellite
+ENV DISPLAY=:0
+
 # Install development toolchain (ADAPT TO YOUR OWN NEEDS)
 RUN zypper in -y gcc
 

@@ -13,11 +13,16 @@ pub struct Command {}
 
 impl Command {
     pub fn run(self) -> Result<()> {
+        crate::sandbox::apply_landlock()?;
+
         let session_lock_path = Path::new("/session.lock");
         let inotify = Inotify::init(InitFlags::empty())?;
         inotify.add_watch(session_lock_path, AddWatchFlags::IN_MODIFY)?;
 
         info!("Litterbox has started");
+
+        start_xwayland_satellite();
+
         debug!("Waiting for sessions to end");
 
         loop {
@@ -69,5 +74,23 @@ impl Command {
         info!("Litterbox has finished");
 
         Ok(())
+    }
+}
+
+fn start_xwayland_satellite() {
+    use std::io::ErrorKind;
+    use std::process::Command as ProcessCommand;
+
+    let mut cmd = ProcessCommand::new("xwayland-satellite");
+    if let Ok(display) = std::env::var("DISPLAY") {
+        cmd.arg(display);
+    }
+
+    match cmd.spawn() {
+        Ok(_) => info!("Started xwayland-satellite"),
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            debug!("xwayland-satellite not found in PATH");
+        }
+        Err(e) => warn!("Failed to start xwayland-satellite: {e}"),
     }
 }
