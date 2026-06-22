@@ -133,11 +133,11 @@ Litterbox is still very much WIP with many missing features or required improvem
 - [x] Add optional support for port forwarding with the default "pasta" networking.
 - [x] Support entering a Litterbox multiple times.
 - [x] Use `Landlock` to improve isolation strength.
+- [x] Make it possible for X11 apps to run via `xwayland-satellite` integration.
 - [ ] Add a "prune" command to get rid of dangling images.
 - [ ] Add support for more granular network settings.
 - [ ] Show SSH key name when prompting for approval. (Currently blocked by https://github.com/Eugeny/russh/issues/602)
 - [ ] Expose limited DBus access to allow applications to open URLs. Likely using [dbus-proxy](https://github.com/Pelagicore/dbus-proxy).
-- [ ] Make it possible for Xorg apps to run via Wayback integration.
 - [ ] Add full support for running on Windows via WSL.
 - [ ] Add Dockerfile templates for more distros.
 - [ ] Add support for more hardware platforms to the installer.
