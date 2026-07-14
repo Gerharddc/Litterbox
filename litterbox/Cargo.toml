@@ -9,8 +9,8 @@ shared = { path = "../shared" }
 anyhow = "1.0"
 argon2 = "0.6.0-rc.8" # FIXME: bump to stable when 0.6 releases
 clap = { version = "4.5", features = ["derive"] }
-eframe = "0.34"
-egui_extras = { version = "0.34", features = ["svg"] }
+eframe = "0.35"
+egui_extras = { version = "0.35", features = ["svg"] }
 env_logger = "0.11"
 futures = "0.3"
 inquire = "0.9"
@@ -19,7 +19,7 @@ landlock = "0.4"
 log = "0.4"
 nix = { version = "0.31", features = ["fs", "inotify", "signal", "user"] }
 ron = "0.12"
-russh = "0.61"
+russh = "0.62"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 strum = "0.28"
