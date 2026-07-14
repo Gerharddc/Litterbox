@@ -41,6 +41,12 @@ impl eframe::App for ConfirmationDialog<'_> {
                     *self.user_response = UserResponse::ApprovedForSession;
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
+
+                let may_approve_for_10s = *self.user_request == UserRequest::Sign;
+                if may_approve_for_10s && ui.button("Approve for 10s").clicked() {
+                    *self.user_response = UserResponse::ApprovedFor10s;
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                }
             });
         });
     }

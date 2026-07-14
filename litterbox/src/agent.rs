@@ -4,8 +4,10 @@ use russh::keys::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 use strum_macros::{Display, EnumString};
 use tokio::process::Command;
+use tokio::sync::Mutex;
 
 use crate::files::SshSockFile;
 use crate::{
@@ -45,6 +47,7 @@ pub enum UserResponse {
     Approved,
     Declined,
     ApprovedForSession,
+    ApprovedFor10s,
 }
 
 pub struct AgentState {
@@ -53,6 +56,9 @@ pub struct AgentState {
 
     /// When set, users no longer need to approve requests to list keys
     pub approved_for_session: AtomicBool,
+
+    /// When set, signing requests are automatically approved until this instant
+    pub sign_approved_until: Mutex<Option<Instant>>,
 }
 
 impl Default for AgentState {
@@ -60,6 +66,7 @@ impl Default for AgentState {
         Self {
             locked: AtomicBool::new(false),
             approved_for_session: AtomicBool::new(false),
+            sign_approved_until: Mutex::new(None),
         }
     }
 }
@@ -97,6 +104,14 @@ impl agent::server::Agent for AskAgent {
             return true;
         }
 
+        if request == UserRequest::Sign {
+            let approved_until = *self.agent_state.sign_approved_until.lock().await;
+            if approved_until.is_some_and(|deadline| Instant::now() < deadline) {
+                log::info!("Sign request approved within 10s window, not prompting.");
+                return true;
+            }
+        }
+
         let mut cmd = Command::new(&self.litterbox_path);
         cmd.args([
             "confirm",
@@ -125,6 +140,12 @@ impl agent::server::Agent for AskAgent {
                     self.agent_state
                         .approved_for_session
                         .store(true, Ordering::SeqCst);
+
+                    true
+                }
+                UserResponse::ApprovedFor10s => {
+                    let deadline = Instant::now() + Duration::from_secs(10);
+                    *self.agent_state.sign_approved_until.lock().await = Some(deadline);
 
                     true
                 }
