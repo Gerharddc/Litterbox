@@ -69,6 +69,8 @@ pub struct LitterboxSettings {
     pub expose_kfd: bool,
     #[serde(default = "default_false")]
     pub unconfine_seccomp: bool,
+    #[serde(default = "default_false")]
+    pub unconfine_landlock: bool,
     #[serde(default)]
     pub shm_size_gb: Option<u32>,
     #[serde(default = "default_pasta")]
@@ -165,6 +167,15 @@ impl LitterboxSettings {
             )
             .prompt()?;
 
+        let unconfine_landlock = Confirm::new("Do you want to disable Landlock confinement?")
+            .with_default(existing.map(|s| s.unconfine_landlock).unwrap_or(false))
+            .with_help_message(
+                "A Landlock domain denies every mount operation, so this is required to use \
+                 `mount`, `fusermount3`, bind mounts, etc. inside the Litterbox. It also \
+                 exposes Litterbox's internal files in '/'.",
+            )
+            .prompt()?;
+
         let expose_kfd = if Path::new("/dev/kfd").exists() {
             Confirm::new("Do you want to expose /dev/kfd inside this Litterbox?")
                 .with_default(existing.map(|s| s.expose_kfd).unwrap_or(false))
@@ -225,6 +236,7 @@ impl LitterboxSettings {
             support_tuntap,
             packet_forwarding,
             unconfine_seccomp,
+            unconfine_landlock,
             expose_pipewire,
             keep_groups,
             expose_kfd,

@@ -12,3 +12,11 @@ pub fn xdg_runtime_dir() -> Result<PathBuf> {
 pub fn shell() -> Result<String> {
     get_env("SHELL")
 }
+
+pub fn is_set(var: &'static str) -> bool {
+    std::env::var(var).is_ok()
+}
+
+pub fn unconfine_landlock() -> bool {
+    is_set("LBX_UNCONFINE_LANDLOCK")
+}

@@ -440,6 +440,10 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
         cmd.args(["--security-opt", "seccomp=unconfined"]);
     }
 
+    if settings.unconfine_landlock {
+        cmd.args(["--env", "LBX_UNCONFINE_LANDLOCK=1"]);
+    }
+
     if settings.expose_kfd {
         debug!("Appending KFD device args");
         cmd.args(["--device", "/dev/kfd"]);
