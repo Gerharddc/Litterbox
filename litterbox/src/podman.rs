@@ -444,6 +444,11 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
         cmd.args(["--env", "LBX_UNCONFINE_LANDLOCK=1"]);
     }
 
+    if settings.enable_kvm {
+        debug!("Appending KVM device args");
+        cmd.args(["--device", "/dev/kvm"]);
+    }
+
     if settings.expose_kfd {
         debug!("Appending KFD device args");
         cmd.args(["--device", "/dev/kfd"]);

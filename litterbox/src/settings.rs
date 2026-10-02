@@ -66,6 +66,8 @@ pub struct LitterboxSettings {
     #[serde(default = "default_false")]
     pub keep_groups: bool,
     #[serde(default = "default_false")]
+    pub enable_kvm: bool,
+    #[serde(default = "default_false")]
     pub expose_kfd: bool,
     #[serde(default = "default_false")]
     pub unconfine_seccomp: bool,
@@ -176,6 +178,16 @@ impl LitterboxSettings {
             )
             .prompt()?;
 
+        let enable_kvm = if Path::new("/dev/kvm").exists() {
+            Confirm::new("Do you want to enable KVM support in this Litterbox?")
+                .with_default(existing.map(|s| s.enable_kvm).unwrap_or(false))
+                .with_help_message("This will expose '/dev/kvm' to the Litterbox.")
+                .prompt()?
+        } else {
+            debug!("/dev/kvm not found on host system, user not prompted to expose it.");
+            false
+        };
+
         let expose_kfd = if Path::new("/dev/kfd").exists() {
             Confirm::new("Do you want to expose /dev/kfd inside this Litterbox?")
                 .with_default(existing.map(|s| s.expose_kfd).unwrap_or(false))
@@ -239,6 +251,7 @@ impl LitterboxSettings {
             unconfine_landlock,
             expose_pipewire,
             keep_groups,
+            enable_kvm,
             expose_kfd,
             shm_size_gb,
             custom_podman_args,
