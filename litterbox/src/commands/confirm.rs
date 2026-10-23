@@ -67,7 +67,7 @@ pub struct Command {
 impl Command {
     pub fn run(self) -> Result<()> {
         let mut native_options = eframe::NativeOptions::default();
-        native_options.viewport.inner_size = Some((270.0, 340.0).into());
+        native_options.viewport.inner_size = Some((290.0, 365.0).into());
 
         let user_request = self
             .request
