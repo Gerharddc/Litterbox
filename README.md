@@ -85,7 +85,7 @@ First you will need to define your Litterbox by running `litterbox define LBX_NA
 
 Then you will need to build your Litterbox by running `litterbox build LBX_NAME`. If you ever want to delete it again, simply run `litterbox delete LBX_NAME`. If you try to build a Litterbox that already exists, you will be offered the option to rebuild it or to do nothing.
 
-During the build process, you will be asked various questions related to how you want to configure this Litterbox. These primarily concern which non-default access you want to give this Litterbox (such as wether it should have access to PipeWire). These settings are stored at `~/Litterbox/LBX_NAME.ron` and can be changed either by editing the file directly or by rebuilding the Litterbox and opting to change the settings. You will have to rebuild the Litterbox after changing the settings file for things to take effect though.
+During the build process, you will be asked various questions related to how you want to configure this Litterbox. These primarily concern which non-default access you want to give this Litterbox (such as wether it should have access to PipeWire). These settings are stored at `~/Litterbox/definitions/LBX_NAME.ron` and can be changed either by editing the file directly or by rebuilding the Litterbox and opting to change the settings. The settings file is reloaded every time you enter the Litterbox: if the container is not running, it is recreated with the new settings (after committing its filesystem, so changes made inside the container outside your home directory are preserved). If the container is running, the new settings are applied the next time it is recreated. Changes to the Dockerfile still require rebuilding the image.
 
 ### 3. Enter
 
