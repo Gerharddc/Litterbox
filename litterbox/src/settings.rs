@@ -112,7 +112,9 @@ impl LitterboxSettings {
         Ok(settings)
     }
 
-    fn load(lbx_name: &str) -> Result<Option<Self>> {
+    /// Load the settings from disk without prompting. Returns `None` when no
+    /// settings file exists yet.
+    pub fn load(lbx_name: &str) -> Result<Option<Self>> {
         let path = settings_path(lbx_name)?;
         if !path.exists() {
             debug!("Settings file does not exist for {}", lbx_name);
@@ -122,6 +124,19 @@ impl LitterboxSettings {
         let contents = read_file(&path)?;
         let settings: Self = ron::from_str(&contents)?;
         Ok(Some(settings))
+    }
+
+    /// Stable fingerprint of the settings, used to detect when an existing
+    /// container was created with a different configuration.
+    pub fn fingerprint(&self) -> String {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let serialized =
+            ron::ser::to_string(self).expect("Litterbox settings should be serialisable");
+        let mut hasher = DefaultHasher::new();
+        serialized.hash(&mut hasher);
+
+        format!("{:016x}", hasher.finish())
     }
 
     fn save_to_file(&self, lbx_name: &str) -> Result<()> {

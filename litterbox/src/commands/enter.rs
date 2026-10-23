@@ -1,8 +1,10 @@
 use crate::{
     daemon, files,
     podman::{
-        get_container, is_container_running, start_daemon, wait_for_podman, wait_for_podman_async,
+        commit_container, create_container, get_container, get_image, is_container_running,
+        start_daemon, wait_for_podman, wait_for_podman_async,
     },
+    settings::LitterboxSettings,
     utils::trace_arguments,
 };
 use anyhow::{Context as _, Result, anyhow};
@@ -78,8 +80,54 @@ impl Command {
     pub fn run(self) -> Result<()> {
         use std::process::Command;
 
-        let container = get_container(&self.name)?
+        let mut container = get_container(&self.name)?
             .ok_or_else(|| anyhow!("No container found for '{}'", self.name))?;
+
+        // Container configuration (network mode, capabilities, etc.) is baked
+        // into the podman container at creation time. Reload the settings on
+        // every enter so that edits to the RON file take effect without having
+        // to run `litterbox build` again.
+        let settings = LitterboxSettings::load(&self.name)?;
+
+        if let Some(settings) = settings.as_ref()
+            && container.labels.settings.as_deref() != Some(settings.fingerprint().as_str())
+        {
+            if is_container_running(&self.name)? {
+                warn!(
+                    "The settings for '{}' changed, but the container is running. The new \
+                     settings will be applied the next time the container is stopped.",
+                    self.name
+                );
+            } else {
+                let container_name = container
+                    .names
+                    .first()
+                    .cloned()
+                    .ok_or_else(|| anyhow!("Container for '{}' has no name", self.name))?;
+                let image_name = get_image(&self.name)?
+                    .and_then(|image| image.names.into_iter().next())
+                    .ok_or_else(|| anyhow!("No image found for '{}'", self.name))?;
+
+                info!(
+                    "Settings for '{}' changed; recreating container...",
+                    self.name
+                );
+
+                // Preserve changes made inside the container (outside the
+                // bind-mounted home directory) before the container is
+                // replaced.
+                commit_container(&container.id, &image_name)?;
+
+                files::ensure_ssh_sock_placeholder(&self.name)?;
+                create_container(&self.name, &container_name, &image_name, settings)?;
+
+                container = get_container(&self.name)?
+                    .ok_or_else(|| anyhow!("No container found for '{}'", self.name))?;
+
+                info!("Container recreated with the new settings.");
+            }
+        }
+
         let container_id = container.id;
 
         if !daemon::is_running(&self.name)? {

@@ -67,6 +67,10 @@ impl GpuDevice {
 pub struct ContainerLabels {
     #[serde(rename = "work.litterbox.name")]
     pub name: String,
+
+    /// Fingerprint of the settings this container was created with.
+    #[serde(rename = "work.litterbox.settings", default)]
+    pub settings: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -115,6 +119,7 @@ pub struct Image {
     pub id: String,
 
     #[serde(rename = "Names")]
+    #[serde(default)]
     pub names: Vec<String>,
 }
 
@@ -193,11 +198,29 @@ pub fn get_image(lbx_name: &str) -> Result<Option<Image>> {
     let stdout = extract_stdout(&output)?;
     let Images(mut images) = serde_json::from_str(stdout)?;
 
+    // `podman image ls --all` also reports untagged images, such as the
+    // parents left behind by `podman commit`. They inherit the Litterbox label
+    // but must not be mistaken for the image that belongs to this Litterbox.
+    images.retain(|image| !image.names.is_empty());
+
     match images.len() {
         0 => Ok(None),
         1 => Ok(Some(images.swap_remove(0))),
         _ => bail!("Multiple images found for \"{lbx_name}\""),
     }
+}
+
+/// Commit the container's filesystem to `image_name` so that changes made
+/// inside the container survive the re-creation needed to apply new settings.
+pub fn commit_container(container_id: &str, image_name: &str) -> Result<()> {
+    let mut cmd = Command::new("podman");
+    cmd.args(["commit", container_id, image_name]);
+    trace_arguments(&cmd);
+    let child = cmd.spawn().context("Failed to run podman command")?;
+    wait_for_podman(child)?;
+
+    info!("Committed container state to '{image_name}'.");
+    Ok(())
 }
 
 pub fn define_litterbox(lbx_name: &str) -> anyhow::Result<()> {
@@ -303,17 +326,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
         None => podman_name(lbx_name),
     };
 
-    // --userns=keep-id is used, so this is fine to be used in the container.
-    let uid = getuid();
-
-    let rt_dir = PathBuf::from(&format!("/run/user/{uid}"));
-    let wayland_display = env::wayland_display()?;
-    let host_rt_dir = env::xdg_runtime_dir()?;
-
-    let lbx_home_path = files::lbx_home_path(lbx_name)?;
-    fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
-
-    let ssh_sock = SshSockFile::new(lbx_name, true)?;
+    let _ssh_sock = SshSockFile::new(lbx_name, true)?;
     let settings = LitterboxSettings::load_or_prompt(lbx_name)?;
 
     let session_lock_file_path = files::session_lock_path(lbx_name)?;
@@ -324,6 +337,32 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     }
 
     fs::File::create(&session_lock_file_path).context("Failed to create session lock file")?;
+
+    create_container(lbx_name, &container_name, &image_id, &settings)?;
+
+    Ok(())
+}
+
+/// Create (or replace) the podman container for a Litterbox using the given
+/// settings.
+pub fn create_container(
+    lbx_name: &str,
+    container_name: &str,
+    image_id: &str,
+    settings: &LitterboxSettings,
+) -> Result<()> {
+    // --userns=keep-id is used, so this is fine to be used in the container.
+    let uid = getuid();
+
+    let rt_dir = PathBuf::from(&format!("/run/user/{uid}"));
+    let wayland_display = env::wayland_display()?;
+    let host_rt_dir = env::xdg_runtime_dir()?;
+
+    let lbx_home_path = files::lbx_home_path(lbx_name)?;
+    fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
+
+    let ssh_sock_path = files::ssh_sock_path(lbx_name)?;
+    let session_lock_file_path = files::session_lock_path(lbx_name)?;
 
     let mut cmd = Command::new("podman");
     cmd.arg("create");
@@ -346,7 +385,11 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.args(["--env", &format!("WAYLAND_DISPLAY={wayland_display}")]);
     cmd.args(["--hostname", &format!("lbx-{lbx_name}")]);
     cmd.args(["--label", &format!("work.litterbox.name={lbx_name}")]);
-    cmd.args(["--name", &container_name]);
+    cmd.args([
+        "--label",
+        &format!("work.litterbox.settings={}", settings.fingerprint()),
+    ]);
+    cmd.args(["--name", container_name]);
     cmd.args(["--network", settings.network_mode.podman_args()]);
     cmd.args(["--security-opt", "label=disable"]);
     cmd.args(["--userns", "keep-id"]);
@@ -364,7 +407,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     cmd.arg("--volume");
     cmd.arg(entrypoint_bin_mount);
 
-    let mut ssh_sock_mount = ssh_sock.path().as_os_str().to_owned();
+    let mut ssh_sock_mount = ssh_sock_path.as_os_str().to_owned();
     ssh_sock_mount.push(":");
     ssh_sock_mount.push(&rt_dir);
     ssh_sock_mount.push("/ssh-agent.sock");
@@ -462,7 +505,7 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
     }
 
     // It's best to have the image_id as the final argument
-    cmd.arg(&image_id);
+    cmd.arg(image_id);
 
     trace_arguments(&cmd);
     let child = cmd.spawn().context("Failed to run podman command")?;

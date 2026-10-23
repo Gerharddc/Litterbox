@@ -29,6 +29,22 @@ pub fn settings_path(lbx_name: &str) -> Result<PathBuf> {
     path_relative_to_lbx_root(&format!("definitions/{lbx_name}.ron"))
 }
 
+pub fn ssh_sock_path(lbx_name: &str) -> Result<PathBuf> {
+    path_relative_to_lbx_root(&format!(".ssh/{lbx_name}.sock"))
+}
+
+/// Makes sure the SSH agent socket path exists so that podman has a file to
+/// bind-mount before the daemon has started and bound the actual socket.
+pub fn ensure_ssh_sock_placeholder(lbx_name: &str) -> Result<()> {
+    let path = ssh_sock_path(lbx_name)?;
+
+    if !path.exists() {
+        write_file(&path, "")?;
+    }
+
+    Ok(())
+}
+
 pub fn daemon_lock_path(lbx_name: &str) -> Result<PathBuf> {
     path_relative_to_lbx_root(&format!(".daemon-{lbx_name}.lock"))
 }
@@ -143,7 +159,7 @@ pub struct SshSockFile {
 
 impl SshSockFile {
     pub fn new(lbx_name: &str, create_empty_placeholder: bool) -> Result<Self> {
-        let path = path_relative_to_lbx_root(&format!(".ssh/{lbx_name}.sock"))?;
+        let path = ssh_sock_path(lbx_name)?;
         let path_ref = &path;
 
         if fs::exists(path_ref)? {
