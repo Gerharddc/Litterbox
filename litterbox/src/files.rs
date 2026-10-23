@@ -33,16 +33,25 @@ pub fn ssh_sock_path(lbx_name: &str) -> Result<PathBuf> {
     path_relative_to_lbx_root(&format!(".ssh/{lbx_name}.sock"))
 }
 
-/// Makes sure the SSH agent socket path exists so that podman has a file to
-/// bind-mount before the daemon has started and bound the actual socket.
-pub fn ensure_ssh_sock_placeholder(lbx_name: &str) -> Result<()> {
-    let path = ssh_sock_path(lbx_name)?;
-
+/// Creates an empty file at `path` if it does not exist yet.
+fn ensure_file_exists(path: &Path) -> Result<()> {
     if !path.exists() {
-        write_file(&path, "")?;
+        write_file(path, "")?;
     }
 
     Ok(())
+}
+
+/// Makes sure the SSH agent socket path exists so that podman has a file to
+/// bind-mount before the daemon has started and bound the actual socket.
+pub fn ensure_ssh_sock_placeholder(lbx_name: &str) -> Result<()> {
+    ensure_file_exists(&ssh_sock_path(lbx_name)?)
+}
+
+/// Makes sure the session lock file exists so that podman has a file to
+/// bind-mount. Existing contents are left untouched.
+pub fn ensure_session_lock_file(lbx_name: &str) -> Result<()> {
+    ensure_file_exists(&session_lock_path(lbx_name)?)
 }
 
 pub fn daemon_lock_path(lbx_name: &str) -> Result<PathBuf> {

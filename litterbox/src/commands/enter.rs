@@ -2,10 +2,10 @@ use crate::{
     daemon, files,
     podman::{
         commit_container, create_container, get_container, get_image, is_container_running,
-        start_daemon, wait_for_podman, wait_for_podman_async,
+        start_daemon, validate_container_prerequisites, wait_for_podman, wait_for_podman_async,
     },
     settings::LitterboxSettings,
-    utils::trace_arguments,
+    utils::{podman_name, trace_arguments},
 };
 use anyhow::{Context as _, Result, anyhow};
 use clap::Args;
@@ -80,8 +80,40 @@ impl Command {
     pub fn run(self) -> Result<()> {
         use std::process::Command;
 
-        let mut container = get_container(&self.name)?
-            .ok_or_else(|| anyhow!("No container found for '{}'", self.name))?;
+        let mut container = match get_container(&self.name)? {
+            Some(container) => container,
+            None => {
+                // A previous re-creation may have failed after removing the old
+                // container. Recreate it from the image and saved settings so
+                // that entering still works.
+                let image_name = get_image(&self.name)?
+                    .and_then(|image| image.names.into_iter().next())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "No container found for '{}'. Run `litterbox build {}` first.",
+                            self.name,
+                            self.name
+                        )
+                    })?;
+                let settings = LitterboxSettings::load(&self.name)?.ok_or_else(|| {
+                    anyhow!(
+                        "No container found for '{}' and no settings file to recreate it from. \
+                         Run `litterbox build {}` first.",
+                        self.name,
+                        self.name
+                    )
+                })?;
+
+                info!(
+                    "No container found for '{}'; recreating it from the existing image...",
+                    self.name
+                );
+                create_container(&self.name, &podman_name(&self.name), &image_name, &settings)?;
+
+                get_container(&self.name)?
+                    .ok_or_else(|| anyhow!("Failed to recreate container for '{}'", self.name))?
+            }
+        };
 
         // Container configuration (network mode, capabilities, etc.) is baked
         // into the podman container at creation time. Reload the settings on
@@ -99,6 +131,10 @@ impl Command {
                     self.name
                 );
             } else {
+                // Check before committing so that a missing build artifact does
+                // not retag the image for nothing.
+                validate_container_prerequisites()?;
+
                 let container_name = container
                     .names
                     .first()
@@ -118,7 +154,6 @@ impl Command {
                 // replaced.
                 commit_container(&container.id, &image_name)?;
 
-                files::ensure_ssh_sock_placeholder(&self.name)?;
                 create_container(&self.name, &container_name, &image_name, settings)?;
 
                 container = get_container(&self.name)?

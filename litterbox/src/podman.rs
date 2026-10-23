@@ -210,6 +210,21 @@ pub fn get_image(lbx_name: &str) -> Result<Option<Image>> {
     }
 }
 
+/// Ensure the host-side prerequisites for creating a container exist.
+///
+/// This runs before an existing container is committed or replaced so that a
+/// failed re-creation leaves the old container untouched.
+pub fn validate_container_prerequisites() -> Result<()> {
+    let lbx_init = env::lbx_init_binary_path();
+    ensure!(
+        lbx_init.is_file(),
+        "The lbx-init binary was not found at {}. Build lbx-init before running this command.",
+        lbx_init.display()
+    );
+
+    Ok(())
+}
+
 /// Commit the container's filesystem to `image_name` so that changes made
 /// inside the container survive the re-creation needed to apply new settings.
 pub fn commit_container(container_id: &str, image_name: &str) -> Result<()> {
@@ -345,12 +360,17 @@ pub fn build_litterbox(lbx_name: &str) -> Result<()> {
 
 /// Create (or replace) the podman container for a Litterbox using the given
 /// settings.
+///
+/// The caller is responsible for preserving anything that must survive the
+/// replacement (e.g. by committing the container to its image first).
 pub fn create_container(
     lbx_name: &str,
     container_name: &str,
-    image_id: &str,
+    image: &str,
     settings: &LitterboxSettings,
 ) -> Result<()> {
+    validate_container_prerequisites()?;
+
     // --userns=keep-id is used, so this is fine to be used in the container.
     let uid = getuid();
 
@@ -360,6 +380,11 @@ pub fn create_container(
 
     let lbx_home_path = files::lbx_home_path(lbx_name)?;
     fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
+
+    // podman needs these bind-mount sources to exist before the container is
+    // created. Existing files/sockets are left untouched.
+    files::ensure_ssh_sock_placeholder(lbx_name)?;
+    files::ensure_session_lock_file(lbx_name)?;
 
     let ssh_sock_path = files::ssh_sock_path(lbx_name)?;
     let session_lock_file_path = files::session_lock_path(lbx_name)?;
@@ -509,8 +534,8 @@ pub fn create_container(
         }
     }
 
-    // It's best to have the image_id as the final argument
-    cmd.arg(image_id);
+    // It's best to have the image as the final argument
+    cmd.arg(image);
 
     trace_arguments(&cmd);
     let child = cmd.spawn().context("Failed to run podman command")?;
