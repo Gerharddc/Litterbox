@@ -12,7 +12,7 @@
 
 Litterbox is a Linux sandbox environment catered to the needs of developers. Its primary goal is to provide SOME isolation between a containerised development environment and a host system. Its secondary goal is to provide a repeatable and documented environment for development.
 
-The isolation goal is to prevent rogue processes (which might arrive through a supply chain attack or similar) from gaining access to sensitive files on your home directory or access to all of your SSH keys. Litterbox achieves file system isolation by restricting a development container to only have access to a single folder on your host system (and nothing above it). SSH key protection is achieved with a custom SSH agent that only exposes a limited number of SSH keys to a single Litterbox and prompts the user (via a pop-up window) before completing any signing requests.
+The isolation goal is to prevent rogue processes (which might arrive through a supply chain attack or similar) from gaining access to sensitive files on your home directory or access to all of your SSH keys. Litterbox achieves file system isolation by restricting a development container to its own home directory and any folders you explicitly mount into it (with nothing above those paths visible). SSH key protection is achieved with a custom SSH agent that only exposes a limited number of SSH keys to a single Litterbox and prompts the user (via a pop-up window) before completing any signing requests.
 
 N.B. Litterbox is free software that does not come with any warranty or guarantees. It is not an anti-malware solution and does not guarantee that your system will be protected from any attacks. Its goal is just to be BETTER THAN NOTHING but even that is not guaranteed. By using this software you agree that you are doing so at your own risk and take full responsibility for anything that might happen.
 
@@ -36,6 +36,7 @@ By design, Litterbox comes with AT LEAST the following limitation/vulnerabilitie
 - By default, Litterbox only provides limited network isolation. You should therefore be very careful to not have anything sensitive and/or vulnerable accessible on your network.
 - Litterbox hosts an SSH agent server powered by [russh](https://crates.io/crates/russh). The goal of this server is to provide restricted access to SSH keys inside a Litterbox through a shared socket. Thus, anything running inside a Litterbox could still exploit vulnerabilities in this library to gain full access to your system.
 - When you expose a device inside a Litterbox, you grant everything inside the Litterbox full access to that device.
+- When you explicitly mount a project directory into a Litterbox, everything inside that Litterbox can read and write the mounted project. Other directories on the host remain inaccessible unless you mount them as well.
 - Currently Litterbox has many external dependencies which unfortunately makes Litterbox itself vulnerable to supply chain attacks. A long-term goal is thus to reduce the number of external dependencies to a bare minimum.
 
 N.B. it is again emphasised that Litterbox does not come with any warranties or guarantees. Using it is at your own risk and the Litterbox authors do not accept any libiality for damages that might be incurred.
@@ -98,6 +99,27 @@ If you want SSH keys to be available inside a Litterbox, simply run `litterbox k
 ### 5. Devices
 
 If you ever need to make a device (such as a virtual serial port) available inside a Litterbox, simply run `litterbox device LBX_NAME DEVICE_PATH`. This will make the device available inside the Litterbox by creating a device node inside its home directory. To remove the device again later, simply delete this file that got created. Please note that the device node corresponds to a device using its device number and not some higher level identifier. Thus, if you for instance unplug the device and plug in a new device of the same type, the device node will now point to the new device. So be careful what you expose inside the Litterbox!
+
+### 6. Mounting host projects
+
+You do not have to move your projects into `~/Litterbox/homes` in order to work on them. From inside a project directory, run:
+
+```bash
+cd /path/to/project
+litterbox enter LBX_NAME --mount
+```
+
+This makes the current directory available inside the Litterbox at `~/shared/<project-name>` (for example, `~/shared/project`) and starts the shell there. Use `--mount PATH` to mount a different directory, and repeat the option to mount several projects at once:
+
+```bash
+litterbox enter LBX_NAME --mount /path/to/one --mount /path/to/two
+```
+
+Only the directories you explicitly mount become visible. Other projects that stay unmounted remain inaccessible to the container.
+
+The host-side bind mounts require root privileges, so Litterbox uses `sudo` for them (the same way `litterbox device` creates device nodes). The first `--mount` on a Litterbox that was created without dynamic mount support recreates the container, preserving its filesystem state. If the container is still running, exit all of its sessions first so that it can be recreated safely.
+
+Mounts are kept for the lifetime of the running container and are shared by all terminals attached to that Litterbox. They are cleaned up the next time the stopped Litterbox is entered, before the new set of mounts is applied. The shared directory itself is read-only inside the container; only the explicitly mounted project directories are writable. Landlock grants each terminal access to the mounts that exist when it starts, so a terminal that was already open before another terminal added a mount may need to be restarted to access the new project.
 
 ## Comparison to alternatives
 

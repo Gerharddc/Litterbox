@@ -1,10 +1,30 @@
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use landlock::{
     ABI, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, path_beneath_rules,
 };
 use log::{debug, error};
+use std::path::PathBuf;
 
-pub fn apply_landlock() -> Result<()> {
+pub fn apply_landlock(allowed_mounts: &[PathBuf]) -> Result<()> {
+    // Landlock rules are attached to inodes, not mount points. A directory
+    // that was bind-mounted from the host has an inode that is not below the
+    // container's home inode, so each dynamic mount needs its own rule.
+    if !allowed_mounts.is_empty() {
+        let mount_points = shared::mountinfo::read_mountinfo()?;
+
+        for path in allowed_mounts {
+            let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
+
+            ensure!(
+                mount_points
+                    .iter()
+                    .any(|mount| mount.mount_point == canonical),
+                "{path:?} is not a mount point inside the Litterbox. The host-side mount did not \
+                 propagate; make sure the host mount directory is a shared mount."
+            );
+        }
+    }
+
     // We avoid giving full access to the container's entire root directory so
     // that we can deny access to "internal" files that Litterbox places within
     // the root directory.
@@ -24,7 +44,8 @@ pub fn apply_landlock() -> Result<()> {
             ["/lbx-init", "/prep-home.sh"],
             AccessFs::Execute | AccessFs::ReadFile,
         ))?
-        .add_rules(path_beneath_rules(["/session.lock"], AccessFs::ReadFile))?;
+        .add_rules(path_beneath_rules(["/session.lock"], AccessFs::ReadFile))?
+        .add_rules(path_beneath_rules(allowed_mounts, access_all))?;
 
     match ruleset.restrict_self() {
         Ok(status) => debug!("Landlock sandbox applied: {status:?}"),

@@ -53,13 +53,25 @@ pub fn ensure_ssh_sock_placeholder(lbx_name: &str) -> Result<()> {
 pub fn ensure_session_lock_file(lbx_name: &str) -> Result<()> {
     ensure_file_exists(&session_lock_path(lbx_name)?)
 }
-
 pub fn daemon_lock_path(lbx_name: &str) -> Result<PathBuf> {
     path_relative_to_lbx_root(&format!(".daemon-{lbx_name}.lock"))
 }
 
 pub fn session_lock_path(lbx_name: &str) -> Result<PathBuf> {
     path_relative_to_lbx_root(&format!(".session-{lbx_name}.lock"))
+}
+
+/// Host directory that holds the dynamically mounted project directories for
+/// a Litterbox. It is bind-mounted into the container at
+/// [`crate::mounts::CONTAINER_SHARED_DIR`].
+pub fn mounts_dir_path(lbx_name: &str) -> Result<PathBuf> {
+    path_relative_to_lbx_root(&format!("mounts/{lbx_name}"))
+}
+
+/// Serialises mount changes for a Litterbox across concurrent `enter`
+/// invocations.
+pub fn mount_lock_path(lbx_name: &str) -> Result<PathBuf> {
+    path_relative_to_lbx_root(&format!(".mounts-{lbx_name}.lock"))
 }
 
 pub fn daemon_log_file(lbx_name: &str) -> Result<File> {
