@@ -16,7 +16,7 @@ pub struct Command {}
 
 impl Command {
     pub fn run(self) -> Result<()> {
-        crate::sandbox::apply_landlock()?;
+        crate::sandbox::apply_landlock(&[])?;
 
         let session_lock_path = Path::new("/session.lock");
         let inotify = Inotify::init(InitFlags::empty())?;
