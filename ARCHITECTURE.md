@@ -104,8 +104,9 @@ This allows multiple concurrent sessions (e.g., multiple terminals) to share one
 
 When a user runs `litterbox enter NAME`:
 
-1. **Container Check** - Verify container exists; start if not running
-2. **Daemon Start** - If daemon not running, spawn it with the key password via stdin
-3. **Session Registration** - Add terminal PID to session lockfile
-4. **Entrypoint** - Run `/lbx-init entrypoint` to initialize user's home directory (only on first entry) and then enter the default shell
-5. **Shell Launch** - Start user's shell inside the container
+1. **Settings Reload** - Re-read `~/Litterbox/definitions/NAME.ron`. If it differs from the `work.litterbox.settings` fingerprint label recorded on the container and the container is stopped, commit the container's filesystem to its image and recreate the container with the new settings. Running containers are left untouched; their settings are applied on the next re-creation.
+2. **Container Check** - Verify the container exists (recreate it from the existing image and settings if it was lost); start if not running
+3. **Daemon Start** - If daemon not running, spawn it with the key password via stdin
+4. **Session Registration** - Add terminal PID to session lockfile
+5. **Entrypoint** - Run `/lbx-init entrypoint` to initialize user's home directory (only on first entry) and then enter the default shell
+6. **Shell Launch** - Start user's shell inside the container
