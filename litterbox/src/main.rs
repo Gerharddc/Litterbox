@@ -8,6 +8,7 @@ mod devices;
 mod env;
 mod files;
 mod keys;
+mod mounts;
 mod podman;
 mod settings;
 mod template;

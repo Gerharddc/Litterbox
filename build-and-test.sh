@@ -16,21 +16,25 @@ lint()  { cargo_ok "$1" clippy; }
 test_() { cargo_ok "$1" test; }
 
 echo "=== Building ==="
+build shared
 build litterbox
 build lbx-init
 
 echo ""
 echo "=== Testing ==="
+test_ shared
 test_ litterbox
 test_ lbx-init
 
 echo ""
 echo "=== Formatting ==="
+check shared
 check litterbox
 check lbx-init
 
 echo ""
 echo "=== Linting ==="
+lint shared
 lint litterbox
 lint lbx-init
 

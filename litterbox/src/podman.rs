@@ -16,6 +16,7 @@ use crate::{
     env,
     files::{self, SshSockFile},
     keys::Keys,
+    mounts,
     settings::LitterboxSettings,
     utils::{extract_stdout, podman_name, trace_arguments},
 };
@@ -71,6 +72,11 @@ pub struct ContainerLabels {
     /// Fingerprint of the settings this container was created with.
     #[serde(rename = "work.litterbox.settings", default)]
     pub settings: Option<String>,
+
+    /// Set when the container was created with the shared mount used for
+    /// dynamically mounted project directories.
+    #[serde(rename = "work.litterbox.shared", default)]
+    pub shared: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -224,7 +230,6 @@ pub fn validate_container_prerequisites() -> Result<()> {
 
     Ok(())
 }
-
 /// Commit the container's filesystem to `image_name` so that changes made
 /// inside the container survive the re-creation needed to apply new settings.
 pub fn commit_container(container_id: &str, image_name: &str) -> Result<()> {
@@ -370,7 +375,6 @@ pub fn create_container(
     settings: &LitterboxSettings,
 ) -> Result<()> {
     validate_container_prerequisites()?;
-
     // --userns=keep-id is used, so this is fine to be used in the container.
     let uid = getuid();
 
@@ -380,6 +384,15 @@ pub fn create_container(
 
     let lbx_home_path = files::lbx_home_path(lbx_name)?;
     fs::create_dir_all(&lbx_home_path).context("Failed to create litterbox home directory")?;
+
+    // The home directory is mounted over the image's home, so the target for
+    // the shared mount must exist inside the home directory itself.
+    fs::create_dir_all(lbx_home_path.join("shared"))
+        .context("Failed to create shared directory in the Litterbox home")?;
+
+    let lbx_shared_host_path = mounts::shared_dir(lbx_name)?;
+    let shared_propagation_ready = mounts::propagation_ready(&lbx_shared_host_path)
+        .context("Failed to inspect mount propagation for the Litterbox mount directory")?;
 
     // podman needs these bind-mount sources to exist before the container is
     // created. Existing files/sockets are left untouched.
@@ -413,6 +426,17 @@ pub fn create_container(
     cmd.args([
         "--label",
         &format!("work.litterbox.settings={}", settings.fingerprint()),
+    ]);
+    cmd.args([
+        "--label",
+        &format!(
+            "work.litterbox.shared={}",
+            if shared_propagation_ready {
+                mounts::SHARED_MOUNT_LABEL
+            } else {
+                mounts::SHARED_MOUNT_CONFIGURED
+            }
+        ),
     ]);
     cmd.args(["--name", container_name]);
     cmd.args(["--network", settings.network_mode.podman_args()]);
@@ -457,6 +481,20 @@ pub fn create_container(
 
     cmd.arg("--volume");
     cmd.arg(home_mount);
+
+    // Project directories are bind mounted below this directory on the host
+    // and propagate into the container.
+    let mut shared_mount = lbx_shared_host_path.into_os_string();
+    shared_mount.push(":");
+    shared_mount.push(mounts::CONTAINER_SHARED_DIR);
+    shared_mount.push(if shared_propagation_ready {
+        ":ro,rslave"
+    } else {
+        ":ro"
+    });
+
+    cmd.arg("--volume");
+    cmd.arg(shared_mount);
 
     match GpuDevice::try_detect() {
         Some(dev) => {
@@ -606,6 +644,18 @@ pub fn delete_litterbox(lbx_name: &str) -> Result<()> {
 
     wait_for_podman(child)?;
     info!("Image for Litterbox deleted!");
+
+    // The container is gone, so the project mounts can be removed. This is
+    // best-effort: failing to clean up the host mounts must not prevent the
+    // rest of the deletion from succeeding.
+    let cleanup = mounts::lock(lbx_name).and_then(|_lock| mounts::cleanup_all(lbx_name));
+    if let Err(cause) = cleanup {
+        warn!("Failed to clean up dynamic project mounts: {cause:#}");
+    }
+
+    if let Ok(path) = files::mount_lock_path(lbx_name) {
+        let _ = fs::remove_file(path);
+    }
 
     let home_path = files::lbx_home_path(lbx_name)?;
     if home_path.exists() {

@@ -1,13 +1,14 @@
 use crate::{
-    daemon, files,
+    daemon, files, mounts,
     podman::{
-        commit_container, create_container, get_container, get_image, is_container_running,
-        start_daemon, validate_container_prerequisites, wait_for_podman, wait_for_podman_async,
+        Container, commit_container, create_container, get_container, get_image,
+        is_container_running, start_daemon, validate_container_prerequisites, wait_for_podman,
+        wait_for_podman_async,
     },
     settings::LitterboxSettings,
     utils::{podman_name, trace_arguments},
 };
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Context as _, Result, anyhow, ensure};
 use clap::Args;
 use log::{debug, info, warn};
 use nix::unistd::{Pid, getgid, getuid};
@@ -72,6 +73,18 @@ pub struct Command {
     #[arg(long, short)]
     workdir: Option<PathBuf>,
 
+    /// Mount a host directory into the Litterbox at ~/shared/NAME, defaulting
+    /// to the current directory. May be repeated. Requires root privileges on
+    /// the host.
+    #[arg(
+        long,
+        value_name = "PATH",
+        num_args = 0..=1,
+        default_missing_value = ".",
+        action = clap::ArgAction::Append
+    )]
+    mount: Vec<PathBuf>,
+
     #[clap(flatten)]
     opts: CommonEntrypointOptions,
 }
@@ -115,11 +128,33 @@ impl Command {
             }
         };
 
+        let requested_mounts = mounts::resolve(&self.mount)?;
+        let shared_host_dir = mounts::shared_dir(&self.name)?;
+
+        let propagation_ready =
+            !requested_mounts.is_empty() && mounts::propagation_ready(&shared_host_dir)?;
+
+        let shared_ready = container.labels.shared.as_deref() == Some(mounts::SHARED_MOUNT_LABEL);
+        let needs_shared_setup =
+            !requested_mounts.is_empty() && (!shared_ready || !propagation_ready);
+
+        if needs_shared_setup {
+            ensure!(
+                !is_container_running(&self.name)?,
+                "This Litterbox does not currently have working dynamic mount support. Exit all \
+                 of its sessions and run `litterbox enter {} --mount` again to recreate it.",
+                self.name
+            );
+
+            mounts::ensure_propagation(&shared_host_dir)?;
+        }
+
         // Container configuration (network mode, capabilities, etc.) is baked
         // into the podman container at creation time. Reload the settings on
         // every enter so that edits to the RON file take effect without having
         // to run `litterbox build` again.
         let settings = LitterboxSettings::load(&self.name)?;
+        let mut recreated = false;
 
         if let Some(settings) = settings.as_ref()
             && container.labels.settings.as_deref() != Some(settings.fingerprint().as_str())
@@ -131,39 +166,63 @@ impl Command {
                     self.name
                 );
             } else {
-                // Check before committing so that a missing build artifact does
-                // not retag the image for nothing.
-                validate_container_prerequisites()?;
-
-                let container_name = container
-                    .names
-                    .first()
-                    .cloned()
-                    .ok_or_else(|| anyhow!("Container for '{}' has no name", self.name))?;
-                let image_name = get_image(&self.name)?
-                    .and_then(|image| image.names.into_iter().next())
-                    .ok_or_else(|| anyhow!("No image found for '{}'", self.name))?;
-
                 info!(
                     "Settings for '{}' changed; recreating container...",
                     self.name
                 );
 
-                // Preserve changes made inside the container (outside the
-                // bind-mounted home directory) before the container is
-                // replaced.
-                commit_container(&container.id, &image_name)?;
-
-                create_container(&self.name, &container_name, &image_name, settings)?;
-
-                container = get_container(&self.name)?
-                    .ok_or_else(|| anyhow!("No container found for '{}'", self.name))?;
+                container = recreate_container(&self.name, &container, settings)?;
+                recreated = true;
 
                 info!("Container recreated with the new settings.");
             }
         }
 
-        let container_id = container.id;
+        if needs_shared_setup && !recreated {
+            let settings = settings.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "Cannot recreate '{0}' to enable dynamic mounts because its settings file is \
+                     missing. Run `litterbox build {0}` first.",
+                    self.name
+                )
+            })?;
+
+            info!("Recreating '{}' to enable dynamic mounts...", self.name);
+
+            container = recreate_container(&self.name, &container, settings)?;
+
+            info!("Container recreated with dynamic mount support.");
+        }
+
+        let shared_configured = container.labels.shared.is_some();
+        let supports_dynamic_mounts =
+            container.labels.shared.as_deref() == Some(mounts::SHARED_MOUNT_LABEL);
+        ensure!(
+            requested_mounts.is_empty() || supports_dynamic_mounts,
+            "Internal error: dynamic mount support was not enabled for '{}'",
+            self.name
+        );
+
+        let container_id = container.id.clone();
+        let session_lock = files::session_lock_path(&self.name)?;
+        let my_pid = Pid::this();
+
+        // Serialise session registration and mount changes. This prevents two
+        // concurrent `enter` calls from removing each other's mounts while the
+        // container is stopped.
+        let mount_lock = mounts::lock(&self.name)?;
+        files::cleanup_dead_pids_from_session_lockfile(&session_lock)?;
+
+        let other_sessions = !files::read_pids_from_session_lockfile(&session_lock)?.is_empty();
+        let container_running = is_container_running(&self.name)?;
+
+        // A stopped container gets a clean mount set. While the container is
+        // running, mounts are shared by all of its sessions and are kept.
+        if !container_running && !other_sessions {
+            mounts::cleanup_stale(&self.name)?;
+        }
+
+        files::append_pid_to_session_lockfile(&session_lock, my_pid)?;
 
         if !daemon::is_running(&self.name)? {
             if is_container_running(&self.name)? {
@@ -172,10 +231,6 @@ impl Command {
 
             start_daemon(&self.name)?;
         }
-
-        let my_pid = Pid::this();
-        let session_lock = files::session_lock_path(&self.name)?;
-        files::append_pid_to_session_lockfile(&session_lock, my_pid)?;
 
         if !is_container_running(&self.name)? {
             info!("Container is not running yet; starting now...");
@@ -191,13 +246,36 @@ impl Command {
             debug!("Container {container_id:?} is already running; just attaching...")
         }
 
+        // Mount the projects after the container has started so that the
+        // mounts propagate into its mount namespace. Landlock rules are added
+        // by the entrypoint below, once the paths are visible in the
+        // container.
+        let mut allow_paths = if supports_dynamic_mounts {
+            mounts::apply(&self.name, &requested_mounts)?
+        } else {
+            Vec::new()
+        };
+
+        if shared_configured || !requested_mounts.is_empty() {
+            allow_paths.insert(0, PathBuf::from(mounts::CONTAINER_SHARED_DIR));
+        }
+
+        drop(mount_lock);
+
+        let workdir = self.workdir.or_else(|| {
+            requested_mounts
+                .first()
+                .map(|mount| mount.container_path.clone())
+        });
+
         tokio::runtime::Runtime::new()
             .expect("Tokio runtime should start")
             .block_on(container_exec_entrypoint(
                 container_id,
                 self.interactive,
                 self.tty,
-                self.workdir,
+                workdir,
+                allow_paths,
                 self.opts,
             ))?;
 
@@ -207,11 +285,39 @@ impl Command {
     }
 }
 
+fn recreate_container(
+    lbx_name: &str,
+    container: &Container,
+    settings: &LitterboxSettings,
+) -> Result<Container> {
+    let container_name = container
+        .names
+        .first()
+        .cloned()
+        .ok_or_else(|| anyhow!("Container for '{lbx_name}' has no name"))?;
+    let image_name = get_image(lbx_name)?
+        .and_then(|image| image.names.into_iter().next())
+        .ok_or_else(|| anyhow!("No image found for '{lbx_name}'"))?;
+
+    // Check before committing so that a missing build artifact does not retag
+    // the image for nothing.
+    validate_container_prerequisites()?;
+
+    // Preserve changes made inside the container (outside the bind-mounted
+    // home directory) before the container is replaced.
+    commit_container(&container.id, &image_name)?;
+
+    create_container(lbx_name, &container_name, &image_name, settings)?;
+
+    get_container(lbx_name)?.ok_or_else(|| anyhow!("No container found for '{lbx_name}'"))
+}
+
 async fn container_exec_entrypoint(
     container_id: String,
     interactive: Interactive,
     tty: Tty,
     workdir: Option<PathBuf>,
+    allow_paths: Vec<PathBuf>,
     opts: CommonEntrypointOptions,
 ) -> Result<()> {
     use tokio::process::Command;
@@ -251,6 +357,12 @@ async fn container_exec_entrypoint(
         &opts.wait.to_string(),
     ]);
 
+    // Mounted project directories live outside the container's home mount, so
+    // Landlock needs an explicit rule for each one.
+    for path in allow_paths {
+        exec_child.arg("--allow").arg(path);
+    }
+
     // The entrypoint is responsible for dropping root if needed
     if opts.root {
         exec_child.arg("--root");
@@ -275,4 +387,59 @@ async fn container_exec_entrypoint(
     debug!("Exited Litterbox");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::FromArgMatches;
+
+    fn parse(args: &[&str]) -> Command {
+        let mut command = clap::Command::new("enter");
+        command = <Command as clap::Args>::augment_args(command);
+        let matches = command
+            .try_get_matches_from(args)
+            .expect("arguments should parse");
+
+        Command::from_arg_matches(&matches).expect("arguments should convert")
+    }
+
+    #[test]
+    fn mount_defaults_to_current_directory() {
+        let command = parse(&["enter", "dev", "--mount"]);
+
+        assert_eq!(command.mount, vec![PathBuf::from(".")]);
+    }
+
+    #[test]
+    fn mount_followed_by_an_option_uses_the_default() {
+        let command = parse(&["enter", "dev", "--mount", "--root"]);
+
+        assert_eq!(command.mount, vec![PathBuf::from(".")]);
+        assert!(command.opts.root);
+    }
+
+    #[test]
+    fn mount_accepts_values_and_repeats() {
+        let command = parse(&[
+            "enter",
+            "dev",
+            "--mount",
+            "/host/one",
+            "--mount",
+            "/host/two",
+        ]);
+
+        assert_eq!(
+            command.mount,
+            vec![PathBuf::from("/host/one"), PathBuf::from("/host/two")]
+        );
+    }
+
+    #[test]
+    fn mount_is_optional() {
+        let command = parse(&["enter", "dev"]);
+
+        assert!(command.mount.is_empty());
+    }
 }

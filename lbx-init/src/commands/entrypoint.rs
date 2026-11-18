@@ -17,6 +17,7 @@ use shared::entrypoint::{CommonEntrypointOptions, WaitBehaviour};
 use shared::env;
 use std::{
     os::unix::{fs::symlink, prelude::ExitStatusExt},
+    path::PathBuf,
     process::{ExitStatus, Stdio},
     sync::mpsc::RecvTimeoutError,
     time::Duration,
@@ -32,6 +33,10 @@ pub struct Command {
     /// The GID to drop to if dropping privileges
     #[arg(long, value_parser = |x: &str| x.parse().map(Gid::from_raw))]
     gid: Gid,
+
+    /// Additional paths to allow access to (internal use)
+    #[arg(long = "allow", value_name = "PATH")]
+    allow: Vec<PathBuf>,
 
     #[clap(flatten)]
     opts: CommonEntrypointOptions,
@@ -60,7 +65,7 @@ impl Command {
         if env::unconfine_landlock() {
             warn!("Landlock confinement is disabled; internal files are not protected!");
         } else {
-            sandbox::apply_landlock()?;
+            sandbox::apply_landlock(&self.allow)?;
         }
 
         files::setup_home()?;
