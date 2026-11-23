@@ -17,7 +17,7 @@ inquire = "0.9"
 inquire-derive = "0.9"
 landlock = "0.4"
 log = "0.4"
-nix = { version = "0.31", features = ["fs", "inotify", "signal", "user"] }
+nix = { version = "0.32", features = ["fs", "inotify", "signal", "user"] }
 ron = "0.12"
 russh = "0.65"
 serde = { version = "1.0", features = ["derive"] }
